@@ -176,15 +176,18 @@ backend:
 
   - task: "Reviews CRUD"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "POST /api/reviews, GET /api/restaurants/{id}/reviews - needs testing"
+      - working: true
+        agent: "testing"
+        comment: "Reviews CRUD tested successfully - POST /api/reviews creates review with auth and updates restaurant rating, GET /api/restaurants/{id}/reviews returns reviews for restaurant"
 
   - task: "Payment methods CRUD"
     implemented: true
