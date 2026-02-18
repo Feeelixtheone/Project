@@ -146,15 +146,18 @@ backend:
 
   - task: "Get single restaurant endpoint"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/restaurants/{id} - needs testing"
+      - working: true
+        agent: "testing"
+        comment: "GET /api/restaurants/{id} tested successfully - returns correct restaurant data with proper ID matching"
 
   - task: "Reservations CRUD"
     implemented: true
