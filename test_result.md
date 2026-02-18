@@ -101,3 +101,205 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Build Android/iOS app with login/register, bottom navigation (acasa, restaurante, rezervari, profil, nou, harta), Google Maps integration, modern UI with Montserrat font, Romanian language"
+
+backend:
+  - task: "Health check endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/health returns healthy status"
+
+  - task: "Auth session exchange endpoint"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/auth/session - needs testing with valid session"
+
+  - task: "Get restaurants endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/restaurants returns 5 seeded restaurants"
+
+  - task: "Get single restaurant endpoint"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/restaurants/{id} - needs testing"
+
+  - task: "Reservations CRUD"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/reservations, GET /api/reservations - needs auth testing"
+
+  - task: "Reviews CRUD"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/reviews, GET /api/restaurants/{id}/reviews - needs testing"
+
+  - task: "Payment methods CRUD"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Payment methods endpoints - needs auth testing"
+
+  - task: "Seed data endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/seed - seeded 5 restaurants successfully"
+
+frontend:
+  - task: "Login screen with Google Auth"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Login screen renders with Google button - screenshot verified"
+
+  - task: "Bottom tab navigation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/_layout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "6 tabs implemented: Acasa, Restaurante, Rezervari, Nou, Harta, Profil"
+
+  - task: "Acasa screen with restaurant cards"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/acasa.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Home screen with sorting (Sponsorizate, Populare, Apreciate)"
+
+  - task: "Restaurant detail screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/restaurant/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Detail screen with menu, interior images, reviews, reservation modal"
+
+  - task: "Rezervari screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/rezervari.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Reservations list with filtering"
+
+  - task: "Profil screen with payment"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/profil.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Profile with 3 tabs: Profil, Plati, Setari"
+
+  - task: "Harta screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/harta.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Map placeholder with restaurant list - Google Maps placeholder"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Get single restaurant endpoint"
+    - "Auth flow testing"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Initial implementation complete. Login screen verified via screenshot. Backend API health check and restaurants endpoint working. Need to test auth-protected endpoints and full UI flow."
