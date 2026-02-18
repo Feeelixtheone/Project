@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,10 +7,10 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime
-
+from datetime import datetime, timezone, timedelta
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -25,32 +26,749 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Define Models
-class StatusCheck(BaseModel):
+# ==================== MODELS ====================
+
+# Auth Models
+class User(BaseModel):
+    user_id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class SessionDataResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    session_token: str
+
+# Restaurant Models
+class MenuItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    name: str
+    description: str
+    price: float
+    quantity: str  # e.g., "300g", "1 portion"
+    image_url: str
+    category: str  # e.g., "Aperitive", "Fel principal", "Desert"
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class Restaurant(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: str
+    address: str
+    latitude: float
+    longitude: float
+    cover_image: str
+    interior_images: List[str] = []
+    rating: float = 0.0
+    review_count: int = 0
+    likes: int = 0
+    is_sponsored: bool = False
+    is_new: bool = False
+    cuisine_type: str
+    price_range: str  # "$", "$$", "$$$"
+    opening_hours: str
+    phone: str
+    menu: List[MenuItem] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Add your routes to the router instead of directly to app
+class RestaurantCreate(BaseModel):
+    name: str
+    description: str
+    address: str
+    latitude: float
+    longitude: float
+    cover_image: str
+    interior_images: List[str] = []
+    is_sponsored: bool = False
+    is_new: bool = False
+    cuisine_type: str
+    price_range: str
+    opening_hours: str
+    phone: str
+
+# Review Models
+class Review(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str
+    user_id: str
+    user_name: str
+    user_picture: Optional[str] = None
+    rating: int  # 1-5
+    comment: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ReviewCreate(BaseModel):
+    restaurant_id: str
+    rating: int
+    comment: str
+
+# Reservation Models
+class Reservation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str
+    restaurant_name: str
+    user_id: str
+    user_name: str
+    user_email: str
+    date: str
+    time: str
+    guests: int
+    special_requests: Optional[str] = None
+    status: str = "pending"  # pending, confirmed, cancelled
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ReservationCreate(BaseModel):
+    restaurant_id: str
+    date: str
+    time: str
+    guests: int
+    special_requests: Optional[str] = None
+
+# Payment Models
+class PaymentMethod(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    card_type: str  # "visa", "mastercard", "amex"
+    last_four: str
+    expiry_month: str
+    expiry_year: str
+    is_default: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentMethodCreate(BaseModel):
+    card_type: str
+    last_four: str
+    expiry_month: str
+    expiry_year: str
+    is_default: bool = False
+
+# Like Model
+class RestaurantLike(BaseModel):
+    user_id: str
+    restaurant_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ==================== AUTH HELPERS ====================
+
+async def get_session_token(request: Request) -> Optional[str]:
+    # Check cookie first
+    session_token = request.cookies.get("session_token")
+    if session_token:
+        return session_token
+    # Fallback to Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return None
+
+async def get_current_user(request: Request) -> Optional[User]:
+    session_token = await get_session_token(request)
+    if not session_token:
+        return None
+    
+    session = await db.user_sessions.find_one(
+        {"session_token": session_token},
+        {"_id": 0}
+    )
+    if not session:
+        return None
+    
+    # Check expiry with timezone awareness
+    expires_at = session["expires_at"]
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= datetime.now(timezone.utc):
+        return None
+    
+    user_doc = await db.users.find_one(
+        {"user_id": session["user_id"]},
+        {"_id": 0}
+    )
+    if user_doc:
+        return User(**user_doc)
+    return None
+
+async def require_auth(request: Request) -> User:
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Nu ești autentificat")
+    return user
+
+# ==================== AUTH ROUTES ====================
+
+@api_router.post("/auth/session")
+async def exchange_session(request: Request, response: Response):
+    """Exchange session_id for session_token"""
+    session_id = request.headers.get("X-Session-ID")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Session ID lipsă")
+    
+    # Call Emergent Auth API
+    async with httpx.AsyncClient() as client:
+        try:
+            auth_response = await client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id}
+            )
+            if auth_response.status_code != 200:
+                raise HTTPException(status_code=401, detail="Sesiune invalidă")
+            
+            user_data = auth_response.json()
+        except Exception as e:
+            logger.error(f"Auth API error: {e}")
+            raise HTTPException(status_code=500, detail="Eroare de autentificare")
+    
+    session_data = SessionDataResponse(**user_data)
+    
+    # Check if user exists
+    existing_user = await db.users.find_one(
+        {"email": session_data.email},
+        {"_id": 0}
+    )
+    
+    if existing_user:
+        user_id = existing_user["user_id"]
+    else:
+        # Create new user
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        new_user = {
+            "user_id": user_id,
+            "email": session_data.email,
+            "name": session_data.name,
+            "picture": session_data.picture,
+            "phone": None,
+            "address": None,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.users.insert_one(new_user)
+    
+    # Store session
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "user_id": user_id,
+        "session_token": session_data.session_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc)
+    })
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=session_data.session_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=7 * 24 * 60 * 60
+    )
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"user": user, "session_token": session_data.session_token}
+
+@api_router.get("/auth/me")
+async def get_me(request: Request):
+    """Get current user"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Nu ești autentificat")
+    return user
+
+@api_router.post("/auth/logout")
+async def logout(request: Request, response: Response):
+    """Logout user"""
+    session_token = await get_session_token(request)
+    if session_token:
+        await db.user_sessions.delete_one({"session_token": session_token})
+    
+    response.delete_cookie(key="session_token", path="/")
+    return {"message": "Deconectat cu succes"}
+
+# ==================== USER ROUTES ====================
+
+@api_router.put("/users/me")
+async def update_user(update: UserUpdate, user: User = Depends(require_auth)):
+    """Update current user profile"""
+    update_data = {k: v for k, v in update.dict().items() if v is not None}
+    if update_data:
+        await db.users.update_one(
+            {"user_id": user.user_id},
+            {"$set": update_data}
+        )
+    
+    updated_user = await db.users.find_one({"user_id": user.user_id}, {"_id": 0})
+    return User(**updated_user)
+
+# ==================== RESTAURANT ROUTES ====================
+
+@api_router.get("/restaurants", response_model=List[Restaurant])
+async def get_restaurants(
+    sort_by: str = "sponsored",
+    search: Optional[str] = None
+):
+    """Get all restaurants with sorting"""
+    query = {}
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"cuisine_type": {"$regex": search, "$options": "i"}}
+        ]
+    
+    restaurants = await db.restaurants.find(query, {"_id": 0}).to_list(1000)
+    
+    if sort_by == "sponsored":
+        restaurants.sort(key=lambda x: (not x.get("is_sponsored", False), -x.get("likes", 0)))
+    elif sort_by == "popular":
+        restaurants.sort(key=lambda x: -x.get("review_count", 0))
+    elif sort_by == "liked":
+        restaurants.sort(key=lambda x: -x.get("likes", 0))
+    elif sort_by == "rating":
+        restaurants.sort(key=lambda x: -x.get("rating", 0))
+    elif sort_by == "new":
+        restaurants.sort(key=lambda x: (not x.get("is_new", False), x.get("created_at", datetime.min)), reverse=True)
+    
+    return [Restaurant(**r) for r in restaurants]
+
+@api_router.get("/restaurants/new", response_model=List[Restaurant])
+async def get_new_restaurants():
+    """Get new restaurants"""
+    restaurants = await db.restaurants.find({"is_new": True}, {"_id": 0}).to_list(100)
+    return [Restaurant(**r) for r in restaurants]
+
+@api_router.get("/restaurants/{restaurant_id}", response_model=Restaurant)
+async def get_restaurant(restaurant_id: str):
+    """Get single restaurant"""
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    return Restaurant(**restaurant)
+
+@api_router.post("/restaurants", response_model=Restaurant)
+async def create_restaurant(data: RestaurantCreate):
+    """Create a new restaurant (admin only in real app)"""
+    restaurant = Restaurant(**data.dict())
+    await db.restaurants.insert_one(restaurant.dict())
+    return restaurant
+
+@api_router.post("/restaurants/{restaurant_id}/menu")
+async def add_menu_item(restaurant_id: str, item: MenuItem):
+    """Add menu item to restaurant"""
+    result = await db.restaurants.update_one(
+        {"id": restaurant_id},
+        {"$push": {"menu": item.dict()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    return {"message": "Element adăugat în meniu"}
+
+@api_router.post("/restaurants/{restaurant_id}/like")
+async def toggle_like(
+    restaurant_id: str,
+    user: User = Depends(require_auth)
+):
+    """Toggle like on restaurant"""
+    existing_like = await db.restaurant_likes.find_one({
+        "user_id": user.user_id,
+        "restaurant_id": restaurant_id
+    })
+    
+    if existing_like:
+        await db.restaurant_likes.delete_one({
+            "user_id": user.user_id,
+            "restaurant_id": restaurant_id
+        })
+        await db.restaurants.update_one(
+            {"id": restaurant_id},
+            {"$inc": {"likes": -1}}
+        )
+        return {"liked": False}
+    else:
+        like = RestaurantLike(user_id=user.user_id, restaurant_id=restaurant_id)
+        await db.restaurant_likes.insert_one(like.dict())
+        await db.restaurants.update_one(
+            {"id": restaurant_id},
+            {"$inc": {"likes": 1}}
+        )
+        return {"liked": True}
+
+@api_router.get("/restaurants/{restaurant_id}/liked")
+async def check_liked(
+    restaurant_id: str,
+    user: User = Depends(require_auth)
+):
+    """Check if user liked a restaurant"""
+    existing_like = await db.restaurant_likes.find_one({
+        "user_id": user.user_id,
+        "restaurant_id": restaurant_id
+    })
+    return {"liked": existing_like is not None}
+
+# ==================== REVIEW ROUTES ====================
+
+@api_router.get("/restaurants/{restaurant_id}/reviews", response_model=List[Review])
+async def get_reviews(restaurant_id: str):
+    """Get reviews for a restaurant"""
+    reviews = await db.reviews.find(
+        {"restaurant_id": restaurant_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return [Review(**r) for r in reviews]
+
+@api_router.post("/reviews", response_model=Review)
+async def create_review(
+    data: ReviewCreate,
+    user: User = Depends(require_auth)
+):
+    """Create a review"""
+    review = Review(
+        restaurant_id=data.restaurant_id,
+        user_id=user.user_id,
+        user_name=user.name,
+        user_picture=user.picture,
+        rating=data.rating,
+        comment=data.comment
+    )
+    await db.reviews.insert_one(review.dict())
+    
+    # Update restaurant rating
+    all_reviews = await db.reviews.find(
+        {"restaurant_id": data.restaurant_id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    avg_rating = sum(r["rating"] for r in all_reviews) / len(all_reviews)
+    await db.restaurants.update_one(
+        {"id": data.restaurant_id},
+        {
+            "$set": {"rating": round(avg_rating, 1)},
+            "$inc": {"review_count": 1}
+        }
+    )
+    
+    return review
+
+# ==================== RESERVATION ROUTES ====================
+
+@api_router.get("/reservations", response_model=List[Reservation])
+async def get_reservations(user: User = Depends(require_auth)):
+    """Get user's reservations"""
+    reservations = await db.reservations.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return [Reservation(**r) for r in reservations]
+
+@api_router.post("/reservations", response_model=Reservation)
+async def create_reservation(
+    data: ReservationCreate,
+    user: User = Depends(require_auth)
+):
+    """Create a reservation"""
+    restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    reservation = Reservation(
+        restaurant_id=data.restaurant_id,
+        restaurant_name=restaurant["name"],
+        user_id=user.user_id,
+        user_name=user.name,
+        user_email=user.email,
+        date=data.date,
+        time=data.time,
+        guests=data.guests,
+        special_requests=data.special_requests
+    )
+    await db.reservations.insert_one(reservation.dict())
+    return reservation
+
+@api_router.put("/reservations/{reservation_id}/cancel")
+async def cancel_reservation(
+    reservation_id: str,
+    user: User = Depends(require_auth)
+):
+    """Cancel a reservation"""
+    result = await db.reservations.update_one(
+        {"id": reservation_id, "user_id": user.user_id},
+        {"$set": {"status": "cancelled"}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Rezervare negăsită")
+    return {"message": "Rezervare anulată"}
+
+# ==================== PAYMENT ROUTES ====================
+
+@api_router.get("/payment-methods", response_model=List[PaymentMethod])
+async def get_payment_methods(user: User = Depends(require_auth)):
+    """Get user's payment methods"""
+    methods = await db.payment_methods.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).to_list(100)
+    return [PaymentMethod(**m) for m in methods]
+
+@api_router.post("/payment-methods", response_model=PaymentMethod)
+async def add_payment_method(
+    data: PaymentMethodCreate,
+    user: User = Depends(require_auth)
+):
+    """Add a payment method"""
+    # If this is the first card or set as default, update others
+    if data.is_default:
+        await db.payment_methods.update_many(
+            {"user_id": user.user_id},
+            {"$set": {"is_default": False}}
+        )
+    
+    method = PaymentMethod(
+        user_id=user.user_id,
+        **data.dict()
+    )
+    await db.payment_methods.insert_one(method.dict())
+    return method
+
+@api_router.delete("/payment-methods/{method_id}")
+async def delete_payment_method(
+    method_id: str,
+    user: User = Depends(require_auth)
+):
+    """Delete a payment method"""
+    result = await db.payment_methods.delete_one({
+        "id": method_id,
+        "user_id": user.user_id
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Metodă de plată negăsită")
+    return {"message": "Metodă de plată ștearsă"}
+
+# ==================== SEED DATA ====================
+
+@api_router.post("/seed")
+async def seed_data():
+    """Seed initial restaurant data"""
+    # Check if data already exists
+    count = await db.restaurants.count_documents({})
+    if count > 0:
+        return {"message": "Date deja existente", "count": count}
+    
+    restaurants = [
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Casa Veche",
+            "description": "Restaurant tradițional românesc cu atmosferă caldă și autentică. Savurați cele mai bune preparate locale.",
+            "address": "Str. Victoriei 45, București",
+            "latitude": 44.4268,
+            "longitude": 26.1025,
+            "cover_image": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+            "interior_images": [
+                "https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=800",
+                "https://images.unsplash.com/photo-1538333581680-29dd4752ddf2?w=800"
+            ],
+            "rating": 4.8,
+            "review_count": 245,
+            "likes": 892,
+            "is_sponsored": True,
+            "is_new": False,
+            "cuisine_type": "Românesc",
+            "price_range": "$$",
+            "opening_hours": "10:00 - 23:00",
+            "phone": "+40 21 123 4567",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Sarmale",
+                    "description": "Sarmale în foi de varză cu smântână și mămăligă",
+                    "price": 45.0,
+                    "quantity": "300g",
+                    "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
+                    "category": "Fel Principal"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Ciorbă de burtă",
+                    "description": "Ciorbă tradițională cu smântână și ardei iute",
+                    "price": 28.0,
+                    "quantity": "400ml",
+                    "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
+                    "category": "Supe"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Papanași",
+                    "description": "Papanași cu smântână și dulceață de afine",
+                    "price": 32.0,
+                    "quantity": "2 buc",
+                    "image_url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
+                    "category": "Desert"
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Bucătăria Modernă",
+            "description": "Fuziune contemporană cu ingrediente locale proaspete și prezentări artistice.",
+            "address": "Bd. Unirii 120, București",
+            "latitude": 44.4200,
+            "longitude": 26.1100,
+            "cover_image": "https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=800",
+            "interior_images": [
+                "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800"
+            ],
+            "rating": 4.6,
+            "review_count": 189,
+            "likes": 654,
+            "is_sponsored": False,
+            "is_new": True,
+            "cuisine_type": "Fusion",
+            "price_range": "$$$",
+            "opening_hours": "12:00 - 00:00",
+            "phone": "+40 21 234 5678",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Risotto cu trufe",
+                    "description": "Risotto cremos cu trufe negre și parmezan",
+                    "price": 78.0,
+                    "quantity": "280g",
+                    "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
+                    "category": "Fel Principal"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Tartare de vită",
+                    "description": "Tartare clasic cu gălbenuș și capere",
+                    "price": 65.0,
+                    "quantity": "180g",
+                    "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
+                    "category": "Aperitive"
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pescăruș",
+            "description": "Specialități de fructe de mare și pește proaspăt în ambianță mediteraneană.",
+            "address": "Str. Lipscani 78, București",
+            "latitude": 44.4310,
+            "longitude": 26.0980,
+            "cover_image": "https://images.unsplash.com/photo-1538333581680-29dd4752ddf2?w=800",
+            "interior_images": [],
+            "rating": 4.5,
+            "review_count": 156,
+            "likes": 432,
+            "is_sponsored": True,
+            "is_new": False,
+            "cuisine_type": "Mediteranean",
+            "price_range": "$$$",
+            "opening_hours": "11:00 - 23:00",
+            "phone": "+40 21 345 6789",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Gratar de pește",
+                    "description": "Pește proaspăt la grătar cu legume și lămâie",
+                    "price": 85.0,
+                    "quantity": "350g",
+                    "image_url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
+                    "category": "Fel Principal"
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "La Mama",
+            "description": "Bucătărie tradițională cu rețete moștenite din generație în generație.",
+            "address": "Calea Dorobanți 55, București",
+            "latitude": 44.4450,
+            "longitude": 26.0900,
+            "cover_image": "https://images.pexels.com/photos/785541/pexels-photo-785541.jpeg?w=800",
+            "interior_images": [],
+            "rating": 4.7,
+            "review_count": 320,
+            "likes": 1024,
+            "is_sponsored": False,
+            "is_new": False,
+            "cuisine_type": "Românesc",
+            "price_range": "$",
+            "opening_hours": "09:00 - 22:00",
+            "phone": "+40 21 456 7890",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Mici cu muștar",
+                    "description": "10 mici tradiționali cu muștar și pâine",
+                    "price": 35.0,
+                    "quantity": "10 buc",
+                    "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
+                    "category": "Fel Principal"
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Sushi Master",
+            "description": "Cel mai autentic sushi din oraș, cu ingrediente importate din Japonia.",
+            "address": "Str. Primăverii 22, București",
+            "latitude": 44.4500,
+            "longitude": 26.0850,
+            "cover_image": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800",
+            "interior_images": [],
+            "rating": 4.9,
+            "review_count": 412,
+            "likes": 1567,
+            "is_sponsored": False,
+            "is_new": True,
+            "cuisine_type": "Japonez",
+            "price_range": "$$$",
+            "opening_hours": "12:00 - 23:00",
+            "phone": "+40 21 567 8901",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Dragon Roll",
+                    "description": "Roll cu țipar, avocado și sos unagi",
+                    "price": 58.0,
+                    "quantity": "8 buc",
+                    "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
+                    "category": "Sushi"
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        }
+    ]
+    
+    await db.restaurants.insert_many(restaurants)
+    return {"message": "Date inițiale adăugate", "count": len(restaurants)}
+
+# ==================== BASIC ROUTES ====================
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "API Restaurant App"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -62,13 +780,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
