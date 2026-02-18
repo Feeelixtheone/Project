@@ -161,15 +161,18 @@ backend:
 
   - task: "Reservations CRUD"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "POST /api/reservations, GET /api/reservations - needs auth testing"
+      - working: true
+        agent: "testing"
+        comment: "Reservations CRUD tested successfully - POST /api/reservations creates reservation with proper restaurant lookup, GET /api/reservations returns user reservations with auth"
 
   - task: "Reviews CRUD"
     implemented: true
