@@ -191,15 +191,18 @@ backend:
 
   - task: "Payment methods CRUD"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Payment methods endpoints - needs auth testing"
+      - working: true
+        agent: "testing"
+        comment: "Payment methods CRUD tested successfully - GET /api/payment-methods works with auth, returns empty list initially as expected"
 
   - task: "Seed data endpoint"
     implemented: true
