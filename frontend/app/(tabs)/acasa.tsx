@@ -15,12 +15,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { getRestaurants, seedData, toggleLike } from '../../src/utils/api';
+import { getRestaurants, seedData, toggleLike, apiRequest } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 type SortOption = 'sponsored' | 'popular' | 'liked';
+
+const FOOD_CATEGORIES = [
+  { id: 'all', name: 'Toate', icon: 'grid-outline' },
+  { id: 'pizza', name: 'Pizza', icon: 'pizza-outline' },
+  { id: 'aperitive', name: 'Aperitive', icon: 'restaurant-outline' },
+  { id: 'sushi', name: 'Sushi', icon: 'fish-outline' },
+  { id: 'alcool', name: 'Alcool', icon: 'wine-outline' },
+  { id: 'exclusive', name: 'Exclusive', icon: 'star-outline' },
+  { id: 'bauturi', name: 'Băuturi', icon: 'cafe-outline' },
+  { id: 'deserturi', name: 'Deserturi', icon: 'ice-cream-outline' },
+  { id: 'fast-food', name: 'Fast Food', icon: 'fast-food-outline' },
+];
 
 export default function AcasaScreen() {
   const insets = useSafeAreaInsets();
@@ -30,13 +42,24 @@ export default function AcasaScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('sponsored');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const loadRestaurants = async () => {
     try {
       // First try to seed data if needed
       await seedData().catch(() => {});
       const data = await getRestaurants(sortBy, searchQuery || undefined);
-      setRestaurants(data);
+      
+      // Filter by category if not "all"
+      let filtered = data;
+      if (selectedCategory !== 'all') {
+        filtered = data.filter((r: any) => 
+          r.categories?.includes(selectedCategory) || 
+          r.cuisine_type?.toLowerCase().includes(selectedCategory)
+        );
+      }
+      
+      setRestaurants(filtered);
     } catch (error) {
       console.error('Error loading restaurants:', error);
     } finally {
@@ -46,13 +69,13 @@ export default function AcasaScreen() {
 
   useEffect(() => {
     loadRestaurants();
-  }, [sortBy, searchQuery]);
+  }, [sortBy, searchQuery, selectedCategory]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadRestaurants();
     setRefreshing(false);
-  }, [sortBy, searchQuery]);
+  }, [sortBy, searchQuery, selectedCategory]);
 
   const handleLike = async (restaurantId: string) => {
     try {
@@ -69,6 +92,36 @@ export default function AcasaScreen() {
     { key: 'liked', label: 'Apreciate' },
   ];
 
+  const renderCategoryItem = ({ item }: { item: typeof FOOD_CATEGORIES[0] }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryItem,
+        selectedCategory === item.id && styles.categoryItemActive,
+      ]}
+      onPress={() => setSelectedCategory(item.id)}
+    >
+      <View style={[
+        styles.categoryIconContainer,
+        selectedCategory === item.id && styles.categoryIconContainerActive,
+      ]}>
+        <Ionicons
+          name={item.icon as any}
+          size={24}
+          color={selectedCategory === item.id ? COLORS.text : COLORS.primary}
+        />
+      </View>
+      <Text
+        style={[
+          styles.categoryName,
+          selectedCategory === item.id && styles.categoryNameActive,
+        ]}
+        numberOfLines={1}
+      >
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderRestaurantCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.restaurantCard}
@@ -84,6 +137,14 @@ export default function AcasaScreen() {
           <View style={styles.sponsoredBadge}>
             <Ionicons name="star" size={12} color={COLORS.background} />
             <Text style={styles.sponsoredText}>SPONSORIZAT</Text>
+          </View>
+        )}
+
+        {/* 3D Badge if available */}
+        {item.images_3d && item.images_3d.length > 0 && (
+          <View style={styles.badge3d}>
+            <Ionicons name="cube-outline" size={12} color={COLORS.text} />
+            <Text style={styles.badge3dText}>3D</Text>
           </View>
         )}
         
@@ -160,6 +221,19 @@ export default function AcasaScreen() {
         )}
       </View>
 
+      {/* Food Categories */}
+      <View style={styles.categoriesSection}>
+        <Text style={styles.categoriesTitle}>Categorii</Text>
+        <FlatList
+          horizontal
+          data={FOOD_CATEGORIES}
+          renderItem={renderCategoryItem}
+          keyExtractor={(item) => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      </View>
+
       {/* Sort Options */}
       <View style={styles.sortContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -205,6 +279,14 @@ export default function AcasaScreen() {
             <Text style={styles.emptyText}>
               {isLoading ? 'Se încarcă...' : 'Nu s-au găsit restaurante'}
             </Text>
+            {selectedCategory !== 'all' && (
+              <TouchableOpacity
+                style={styles.clearFilterButton}
+                onPress={() => setSelectedCategory('all')}
+              >
+                <Text style={styles.clearFilterText}>Șterge filtrul</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -267,6 +349,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.text,
     marginLeft: SPACING.sm,
+  },
+  categoriesSection: {
+    marginTop: SPACING.md,
+  },
+  categoriesTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 18,
+    color: COLORS.text,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  categoriesList: {
+    paddingHorizontal: SPACING.lg,
+  },
+  categoryItem: {
+    alignItems: 'center',
+    marginRight: SPACING.md,
+    width: 70,
+  },
+  categoryItemActive: {
+    // Active styles handled by children
+  },
+  categoryIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.xs,
+  },
+  categoryIconContainerActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryName: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  categoryNameActive: {
+    color: COLORS.primary,
+    fontFamily: FONTS.semiBold,
   },
   sortContainer: {
     paddingHorizontal: SPACING.lg,
@@ -336,6 +464,23 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 10,
     color: COLORS.background,
+  },
+  badge3d: {
+    position: 'absolute',
+    top: SPACING.sm,
+    left: SPACING.sm + 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    gap: 4,
+  },
+  badge3dText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    color: COLORS.text,
   },
   likeButton: {
     position: 'absolute',
@@ -424,5 +569,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textMuted,
     marginTop: SPACING.md,
+  },
+  clearFilterButton: {
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  clearFilterText: {
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    color: COLORS.text,
   },
 });
