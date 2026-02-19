@@ -41,6 +41,18 @@ SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 
 # ==================== MODELS ====================
 
+# Food Categories
+FOOD_CATEGORIES = [
+    {"id": "pizza", "name": "Pizza", "icon": "pizza-outline"},
+    {"id": "aperitive", "name": "Aperitive", "icon": "restaurant-outline"},
+    {"id": "sushi", "name": "Sushi", "icon": "fish-outline"},
+    {"id": "alcool", "name": "Alcool", "icon": "wine-outline"},
+    {"id": "exclusive", "name": "Restaurante Exclusive", "icon": "star-outline"},
+    {"id": "bauturi", "name": "Băuturi", "icon": "cafe-outline"},
+    {"id": "deserturi", "name": "Deserturi", "icon": "ice-cream-outline"},
+    {"id": "fast-food", "name": "Fast Food", "icon": "fast-food-outline"},
+]
+
 # Auth Models
 class User(BaseModel):
     user_id: str
@@ -49,6 +61,8 @@ class User(BaseModel):
     picture: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    is_company: bool = False
+    company_id: Optional[str] = None
     created_at: datetime
 
 class UserUpdate(BaseModel):
@@ -63,6 +77,122 @@ class SessionDataResponse(BaseModel):
     picture: Optional[str] = None
     session_token: str
 
+# Company/Business Models
+class Company(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    owner_id: str  # user_id of the owner
+    company_name: str
+    cui: str  # CUI number (2-10 digits)
+    email: str
+    phone: str
+    is_verified: bool = False  # Admin verification status
+    verification_date: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @validator('cui')
+    def validate_cui(cls, v):
+        if not re.match(r'^\d{2,10}$', v):
+            raise ValueError('CUI trebuie să conțină între 2 și 10 cifre')
+        return v
+
+class CompanyRegister(BaseModel):
+    company_name: str
+    cui: str
+    email: str
+    phone: str
+
+    @validator('cui')
+    def validate_cui(cls, v):
+        if not re.match(r'^\d{2,10}$', v):
+            raise ValueError('CUI trebuie să conțină între 2 și 10 cifre')
+        return v
+
+# Product Section for company stores
+class ProductSection(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # e.g., "Aperitive", "Pizza", "Băuturi"
+    order: int = 0
+
+# Company Store/Restaurant
+class CompanyStore(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    name: str
+    description: Optional[str] = None  # Max 50 words
+    address: str
+    latitude: float = 0.0
+    longitude: float = 0.0
+    cover_image: str
+    gallery_images: List[str] = []
+    images_3d: List[str] = []  # 3D meal images
+    sections: List[ProductSection] = []
+    cuisine_type: str
+    categories: List[str] = []  # Food categories
+    price_range: str = "$$"
+    opening_hours: str
+    phone: str
+    is_active: bool = True
+    rating: float = 0.0
+    review_count: int = 0
+    likes: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @validator('description')
+    def validate_description(cls, v):
+        if v and len(v.split()) > 50:
+            raise ValueError('Descrierea nu poate depăși 50 de cuvinte')
+        return v
+
+class CompanyStoreCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    address: str
+    latitude: float = 0.0
+    longitude: float = 0.0
+    cover_image: str
+    gallery_images: List[str] = []
+    sections: List[str] = []  # Section names
+    cuisine_type: str
+    categories: List[str] = []
+    price_range: str = "$$"
+    opening_hours: str
+    phone: str
+
+# Store Product/Menu Item
+class StoreProduct(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    store_id: str
+    section_id: str
+    name: str
+    description: str
+    price: float
+    quantity: str
+    image_url: str
+    image_3d_url: Optional[str] = None  # 3D image
+    is_available: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StoreProductCreate(BaseModel):
+    section_id: str
+    name: str
+    description: str
+    price: float
+    quantity: str
+    image_url: str
+    image_3d_url: Optional[str] = None
+
+# Transaction/Order with fee
+class Transaction(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    store_id: str
+    items: List[dict]  # [{product_id, quantity, price}]
+    subtotal: float
+    fee_amount: float  # 1.7% fee
+    total: float
+    status: str = "pending"  # pending, completed, cancelled
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Restaurant Models
 class MenuItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -71,6 +201,7 @@ class MenuItem(BaseModel):
     price: float
     quantity: str  # e.g., "300g", "1 portion"
     image_url: str
+    image_3d_url: Optional[str] = None
     category: str  # e.g., "Aperitive", "Fel principal", "Desert"
 
 class Restaurant(BaseModel):
@@ -82,16 +213,19 @@ class Restaurant(BaseModel):
     longitude: float
     cover_image: str
     interior_images: List[str] = []
+    images_3d: List[str] = []
     rating: float = 0.0
     review_count: int = 0
     likes: int = 0
     is_sponsored: bool = False
     is_new: bool = False
     cuisine_type: str
+    categories: List[str] = []  # Food categories
     price_range: str  # "$", "$$", "$$$"
     opening_hours: str
     phone: str
     menu: List[MenuItem] = []
+    company_id: Optional[str] = None  # If owned by a company
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RestaurantCreate(BaseModel):
@@ -105,6 +239,7 @@ class RestaurantCreate(BaseModel):
     is_sponsored: bool = False
     is_new: bool = False
     cuisine_type: str
+    categories: List[str] = []
     price_range: str
     opening_hours: str
     phone: str
