@@ -382,6 +382,32 @@ export default function ProfilScreen() {
         </View>
       </View>
 
+      {/* Support Section */}
+      <View style={styles.supportSection}>
+        <Text style={styles.supportSectionTitle}>Suport & Contact</Text>
+        <View style={styles.supportCard}>
+          <View style={styles.supportRow}>
+            <Ionicons name="person-outline" size={20} color={COLORS.primary} />
+            <View style={styles.supportInfo}>
+              <Text style={styles.supportLabel}>Suport clienți</Text>
+              <Text style={styles.supportEmail}>support.clienti@restaurantapp.ro</Text>
+            </View>
+          </View>
+          <View style={styles.supportDivider} />
+          <View style={styles.supportRow}>
+            <Ionicons name="business-outline" size={20} color={COLORS.secondary} />
+            <View style={styles.supportInfo}>
+              <Text style={styles.supportLabel}>Suport firme</Text>
+              <Text style={[styles.supportEmail, { color: COLORS.secondary }]}>support.firme@restaurantapp.ro</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.feeInfo}>
+          <Ionicons name="cash-outline" size={18} color={COLORS.gold} />
+          <Text style={styles.feeInfoText}>Comision platformă: <Text style={styles.feeBold}>1.7%</Text> din achiziții</Text>
+        </View>
+      </View>
+
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
         <Text style={styles.logoutText}>Deconectează-te</Text>
