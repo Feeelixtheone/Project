@@ -903,6 +903,323 @@ async def seed_data():
     await db.restaurants.insert_many(restaurants)
     return {"message": "Date inițiale adăugate", "count": len(restaurants)}
 
+# ==================== COMPANY ROUTES ====================
+
+@api_router.post("/companies/register")
+async def register_company(
+    data: CompanyRegister,
+    user: User = Depends(require_auth)
+):
+    """Register as a company"""
+    # Check if user already has a company
+    existing = await db.companies.find_one({"owner_id": user.user_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ai deja o firmă înregistrată")
+    
+    # Check if CUI already exists
+    cui_exists = await db.companies.find_one({"cui": data.cui})
+    if cui_exists:
+        raise HTTPException(status_code=400, detail="Acest CUI este deja înregistrat")
+    
+    company = Company(
+        owner_id=user.user_id,
+        company_name=data.company_name,
+        cui=data.cui,
+        email=data.email,
+        phone=data.phone
+    )
+    await db.companies.insert_one(company.dict())
+    
+    # Update user as company owner
+    await db.users.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"is_company": True, "company_id": company.id}}
+    )
+    
+    return {"message": "Firma a fost înregistrată. Așteaptă verificarea de către admin.", "company_id": company.id}
+
+@api_router.get("/companies/me")
+async def get_my_company(user: User = Depends(require_auth)):
+    """Get current user's company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ai o firmă înregistrată")
+    return company
+
+@api_router.get("/companies/{company_id}")
+async def get_company(company_id: str):
+    """Get company by ID"""
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
+    return company
+
+@api_router.put("/companies/{company_id}/verify")
+async def verify_company(company_id: str):
+    """Admin: Verify a company (in real app, this would be admin-protected)"""
+    result = await db.companies.update_one(
+        {"id": company_id},
+        {"$set": {"is_verified": True, "verification_date": datetime.now(timezone.utc)}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
+    return {"message": "Firma a fost verificată cu succes"}
+
+# ==================== COMPANY STORE ROUTES ====================
+
+@api_router.post("/stores")
+async def create_store(data: CompanyStoreCreate, user: User = Depends(require_auth)):
+    """Create a store (company must be verified)"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Trebuie să ai o firmă înregistrată")
+    if not company.get("is_verified"):
+        raise HTTPException(status_code=403, detail="Firma ta nu a fost încă verificată de admin")
+    
+    # Create sections
+    sections = [ProductSection(name=name, order=i) for i, name in enumerate(data.sections)]
+    
+    store = CompanyStore(
+        company_id=company["id"],
+        name=data.name,
+        description=data.description,
+        address=data.address,
+        latitude=data.latitude,
+        longitude=data.longitude,
+        cover_image=data.cover_image,
+        gallery_images=data.gallery_images,
+        sections=sections,
+        cuisine_type=data.cuisine_type,
+        categories=data.categories,
+        price_range=data.price_range,
+        opening_hours=data.opening_hours,
+        phone=data.phone
+    )
+    await db.company_stores.insert_one(store.dict())
+    
+    # Also add to restaurants collection for unified display
+    restaurant_data = {
+        "id": store.id,
+        "name": store.name,
+        "description": store.description or "",
+        "address": store.address,
+        "latitude": store.latitude,
+        "longitude": store.longitude,
+        "cover_image": store.cover_image,
+        "interior_images": store.gallery_images,
+        "images_3d": [],
+        "rating": 0.0,
+        "review_count": 0,
+        "likes": 0,
+        "is_sponsored": False,
+        "is_new": True,
+        "cuisine_type": store.cuisine_type,
+        "categories": store.categories,
+        "price_range": store.price_range,
+        "opening_hours": store.opening_hours,
+        "phone": store.phone,
+        "menu": [],
+        "company_id": company["id"],
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.restaurants.insert_one(restaurant_data)
+    
+    return store
+
+@api_router.get("/stores/my")
+async def get_my_stores(user: User = Depends(require_auth)):
+    """Get stores owned by current user's company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        return []
+    
+    stores = await db.company_stores.find({"company_id": company["id"]}, {"_id": 0}).to_list(100)
+    return stores
+
+@api_router.get("/stores/{store_id}")
+async def get_store(store_id: str):
+    """Get store by ID"""
+    store = await db.company_stores.find_one({"id": store_id}, {"_id": 0})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    return store
+
+@api_router.put("/stores/{store_id}")
+async def update_store(store_id: str, data: CompanyStoreCreate, user: User = Depends(require_auth)):
+    """Update a store"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": store_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    update_data = data.dict()
+    update_data["sections"] = [ProductSection(name=name, order=i).dict() for i, name in enumerate(data.sections)]
+    
+    await db.company_stores.update_one({"id": store_id}, {"$set": update_data})
+    
+    # Update restaurant entry too
+    restaurant_update = {
+        "name": data.name,
+        "description": data.description or "",
+        "address": data.address,
+        "cover_image": data.cover_image,
+        "interior_images": data.gallery_images,
+        "cuisine_type": data.cuisine_type,
+        "categories": data.categories,
+        "price_range": data.price_range,
+        "opening_hours": data.opening_hours,
+        "phone": data.phone
+    }
+    await db.restaurants.update_one({"id": store_id}, {"$set": restaurant_update})
+    
+    return {"message": "Magazinul a fost actualizat"}
+
+@api_router.post("/stores/{store_id}/products")
+async def add_store_product(store_id: str, data: StoreProductCreate, user: User = Depends(require_auth)):
+    """Add a product to store"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": store_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    product = StoreProduct(store_id=store_id, **data.dict())
+    await db.store_products.insert_one(product.dict())
+    
+    # Also add to restaurant menu
+    menu_item = {
+        "id": product.id,
+        "name": product.name,
+        "description": product.description,
+        "price": product.price,
+        "quantity": product.quantity,
+        "image_url": product.image_url,
+        "image_3d_url": product.image_3d_url,
+        "category": data.section_id
+    }
+    await db.restaurants.update_one(
+        {"id": store_id},
+        {"$push": {"menu": menu_item}}
+    )
+    
+    return product
+
+@api_router.post("/stores/{store_id}/images-3d")
+async def upload_3d_image(store_id: str, image_url: str, user: User = Depends(require_auth)):
+    """Upload 3D image for store"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": store_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    await db.company_stores.update_one(
+        {"id": store_id},
+        {"$push": {"images_3d": image_url}}
+    )
+    await db.restaurants.update_one(
+        {"id": store_id},
+        {"$push": {"images_3d": image_url}}
+    )
+    
+    return {"message": "Imaginea 3D a fost adăugată"}
+
+# ==================== FOOD CATEGORIES ====================
+
+@api_router.get("/categories")
+async def get_food_categories():
+    """Get all food categories"""
+    return FOOD_CATEGORIES
+
+@api_router.get("/restaurants/by-category/{category_id}")
+async def get_restaurants_by_category(category_id: str):
+    """Get restaurants by food category"""
+    restaurants = await db.restaurants.find(
+        {"categories": category_id},
+        {"_id": 0}
+    ).to_list(100)
+    return [Restaurant(**r) for r in restaurants]
+
+# ==================== TRANSACTIONS ====================
+
+@api_router.post("/transactions")
+async def create_transaction(
+    store_id: str,
+    items: List[dict],  # [{product_id, quantity}]
+    user: User = Depends(require_auth)
+):
+    """Create a transaction with 1.7% fee"""
+    store = await db.company_stores.find_one({"id": store_id}, {"_id": 0})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    # Calculate totals
+    subtotal = 0.0
+    transaction_items = []
+    
+    for item in items:
+        product = await db.store_products.find_one({"id": item["product_id"]}, {"_id": 0})
+        if product:
+            item_total = product["price"] * item["quantity"]
+            subtotal += item_total
+            transaction_items.append({
+                "product_id": item["product_id"],
+                "name": product["name"],
+                "quantity": item["quantity"],
+                "price": product["price"],
+                "total": item_total
+            })
+    
+    fee_amount = round(subtotal * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    total = round(subtotal + fee_amount, 2)
+    
+    transaction = Transaction(
+        user_id=user.user_id,
+        store_id=store_id,
+        items=transaction_items,
+        subtotal=subtotal,
+        fee_amount=fee_amount,
+        total=total
+    )
+    await db.transactions.insert_one(transaction.dict())
+    
+    return {
+        "transaction_id": transaction.id,
+        "subtotal": subtotal,
+        "fee_percentage": TRANSACTION_FEE_PERCENTAGE,
+        "fee_amount": fee_amount,
+        "total": total,
+        "message": f"Comision platformă: {TRANSACTION_FEE_PERCENTAGE}% ({fee_amount} RON)"
+    }
+
+@api_router.get("/transactions")
+async def get_my_transactions(user: User = Depends(require_auth)):
+    """Get user's transactions"""
+    transactions = await db.transactions.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return transactions
+
+# ==================== SUPPORT ====================
+
+@api_router.get("/support/info")
+async def get_support_info():
+    """Get support contact information"""
+    return {
+        "client_support_email": SUPPORT_EMAIL_CLIENTS,
+        "company_support_email": SUPPORT_EMAIL_COMPANIES,
+        "transaction_fee_percentage": TRANSACTION_FEE_PERCENTAGE,
+        "message": "Pentru asistență, contactați-ne la adresele de mai sus."
+    }
+
 # ==================== BASIC ROUTES ====================
 
 @api_router.get("/")
