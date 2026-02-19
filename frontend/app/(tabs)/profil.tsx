@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { getPaymentMethods, addPaymentMethod, deletePaymentMethod, updateUser } from '../../src/utils/api';
+import { getPaymentMethods, addPaymentMethod, deletePaymentMethod, updateUser, apiRequest } from '../../src/utils/api';
 
 type TabType = 'profil' | 'plati' | 'setari';
 
@@ -24,6 +25,7 @@ export default function ProfilScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('profil');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [company, setCompany] = useState<any>(null);
   
   // Edit mode
   const [isEditing, setIsEditing] = useState(false);
@@ -35,6 +37,7 @@ export default function ProfilScreen() {
     if (activeTab === 'plati') {
       loadPaymentMethods();
     }
+    loadCompanyData();
   }, [activeTab]);
 
   useEffect(() => {
@@ -42,6 +45,15 @@ export default function ProfilScreen() {
     setEditPhone(user?.phone || '');
     setEditAddress(user?.address || '');
   }, [user]);
+
+  const loadCompanyData = async () => {
+    try {
+      const companyData = await apiRequest<any>('/api/companies/me');
+      setCompany(companyData);
+    } catch (error) {
+      // User doesn't have a company - that's ok
+    }
+  };
 
   const loadPaymentMethods = async () => {
     try {
