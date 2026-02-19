@@ -396,6 +396,8 @@ async def exchange_session(request: Request, response: Response):
             "picture": session_data.picture,
             "phone": None,
             "address": None,
+            "is_company": False,
+            "company_id": None,
             "created_at": datetime.now(timezone.utc)
         }
         await db.users.insert_one(new_user)
