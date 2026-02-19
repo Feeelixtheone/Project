@@ -308,6 +308,34 @@ export default function ProfilScreen() {
 
   const renderSettingsTab = () => (
     <View style={styles.tabContent}>
+      {/* Company Section */}
+      {company ? (
+        <TouchableOpacity
+          style={styles.companyBanner}
+          onPress={() => router.push('/company/dashboard')}
+        >
+          <View style={styles.companyBannerIcon}>
+            <Ionicons name="business" size={24} color={COLORS.primary} />
+          </View>
+          <View style={styles.companyBannerContent}>
+            <Text style={styles.companyBannerTitle}>{company.company_name}</Text>
+            <Text style={styles.companyBannerSubtitle}>
+              {company.is_verified ? 'Firmă verificată' : 'În așteptare verificare'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.registerCompanyBanner}
+          onPress={() => router.push('/')}
+        >
+          <Ionicons name="business-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.registerCompanyText}>Înregistrează-te ca firmă</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Setări aplicație</Text>
         
