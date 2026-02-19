@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Build Android/iOS app with login/register, bottom navigation (acasa, restaurante, rezervari, profil, nou, harta), Google Maps integration, modern UI with Montserrat font, Romanian language"
+user_problem_statement: "Build Android/iOS app with login/register, bottom navigation (acasa, restaurante, rezervari, profil, nou, harta), Google Maps integration, modern UI with Montserrat font, Romanian language. ENHANCED: Company registration with CUI, food categories, 1.7% transaction fee, support emails, 3D photos"
 
 backend:
   - task: "Health check endpoint"
@@ -117,22 +117,7 @@ backend:
         agent: "main"
         comment: "GET /api/health returns healthy status"
 
-  - task: "Auth session exchange endpoint"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "POST /api/auth/session - needs testing with valid session"
-      - working: true
-        agent: "testing"
-        comment: "Auth flow tested successfully - GET /api/auth/me works with Bearer token authentication. Test user created and session validated."
-
-  - task: "Get restaurants endpoint"
+  - task: "Food categories endpoint"
     implemented: true
     working: true
     file: "/app/backend/server.py"
@@ -142,9 +127,9 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "GET /api/restaurants returns 5 seeded restaurants"
+        comment: "GET /api/categories returns 8 food categories"
 
-  - task: "Get single restaurant endpoint"
+  - task: "Support info endpoint"
     implemented: true
     working: true
     file: "/app/backend/server.py"
@@ -152,72 +137,48 @@ backend:
     priority: "high"
     needs_retesting: false
     status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "GET /api/restaurants/{id} - needs testing"
       - working: true
-        agent: "testing"
-        comment: "GET /api/restaurants/{id} tested successfully - returns correct restaurant data with proper ID matching"
+        agent: "main"
+        comment: "GET /api/support/info returns support emails and 1.7% fee info"
 
-  - task: "Reservations CRUD"
+  - task: "Company registration endpoint"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "POST /api/reservations, GET /api/reservations - needs auth testing"
-      - working: true
-        agent: "testing"
-        comment: "Reservations CRUD tested successfully - POST /api/reservations creates reservation with proper restaurant lookup, GET /api/reservations returns user reservations with auth"
+        comment: "POST /api/companies/register with CUI validation (2-10 digits)"
 
-  - task: "Reviews CRUD"
+  - task: "Company stores CRUD"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
+    priority: "high"
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "POST /api/reviews, GET /api/restaurants/{id}/reviews - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "Reviews CRUD tested successfully - POST /api/reviews creates review with auth and updates restaurant rating, GET /api/restaurants/{id}/reviews returns reviews for restaurant"
+        comment: "POST /api/stores, GET /api/stores/my, add products, 3D images"
 
-  - task: "Payment methods CRUD"
+  - task: "Transaction with 1.7% fee"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
+    priority: "high"
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Payment methods endpoints - needs auth testing"
-      - working: true
-        agent: "testing"
-        comment: "Payment methods CRUD tested successfully - GET /api/payment-methods works with auth, returns empty list initially as expected"
-
-  - task: "Seed data endpoint"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "POST /api/seed - seeded 5 restaurants successfully"
+        comment: "POST /api/transactions calculates 1.7% platform fee"
 
 frontend:
-  - task: "Login screen with Google Auth"
+  - task: "Welcome screen with company registration"
     implemented: true
     working: true
     file: "/app/frontend/app/index.tsx"
@@ -227,79 +188,43 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Login screen renders with Google button - screenshot verified"
+        comment: "Screenshot verified - logo, categories, company registration form with CUI validation"
 
-  - task: "Bottom tab navigation"
+  - task: "Food category filters on home"
     implemented: true
-    working: "NA"
-    file: "/app/frontend/app/(tabs)/_layout.tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "6 tabs implemented: Acasa, Restaurante, Rezervari, Nou, Harta, Profil"
-
-  - task: "Acasa screen with restaurant cards"
-    implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/app/(tabs)/acasa.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
-      - working: "NA"
+      - working: true
         agent: "main"
-        comment: "Home screen with sorting (Sponsorizate, Populare, Apreciate)"
+        comment: "Categories: Pizza, Aperitive, Sushi, Alcool, Exclusive, Bauturi, Deserturi, Fast Food"
 
-  - task: "Restaurant detail screen"
+  - task: "Company dashboard"
     implemented: true
     working: "NA"
-    file: "/app/frontend/app/restaurant/[id].tsx"
+    file: "/app/frontend/app/company/dashboard.tsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Detail screen with menu, interior images, reviews, reservation modal"
+        comment: "Dashboard for creating stores, adding products, 3D images"
 
-  - task: "Rezervari screen"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/app/(tabs)/rezervari.tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Reservations list with filtering"
-
-  - task: "Profil screen with payment"
+  - task: "Profile with support info"
     implemented: true
     working: "NA"
     file: "/app/frontend/app/(tabs)/profil.tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Profile with 3 tabs: Profil, Plati, Setari"
-
-  - task: "Harta screen"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/app/(tabs)/harta.tsx"
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Map placeholder with restaurant list - Google Maps placeholder"
+        comment: "Added support emails, company banner, 1.7% fee info"
 
 metadata:
   created_by: "main_agent"
