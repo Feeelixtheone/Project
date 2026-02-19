@@ -6,9 +6,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 import uuid
+import re
 from datetime import datetime, timezone, timedelta
 import httpx
 
@@ -32,6 +33,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Constants
+TRANSACTION_FEE_PERCENTAGE = 1.7  # 1.7% fee on purchases
+SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
+SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 
 # ==================== MODELS ====================
 
