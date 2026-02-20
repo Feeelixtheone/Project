@@ -975,6 +975,255 @@ async def seed_data():
     await db.restaurants.insert_many(restaurants)
     return {"message": "Date inițiale adăugate", "count": len(restaurants)}
 
+# ==================== CUI VERIFICATION ====================
+
+@api_router.get("/cui/verify/{cui}")
+async def verify_cui(cui: str):
+    """Verify CUI with ANAF API"""
+    result = await verify_cui_anaf(cui)
+    return result
+
+@api_router.post("/companies/register-with-verification")
+async def register_company_with_verification(
+    data: CompanyRegister,
+    user: User = Depends(require_auth)
+):
+    """Register as a company with automatic CUI verification"""
+    # Check if user already has a company
+    existing = await db.companies.find_one({"owner_id": user.user_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ai deja o firmă înregistrată")
+    
+    # Check if CUI already exists in our system
+    cui_exists = await db.companies.find_one({"cui": data.cui})
+    if cui_exists:
+        raise HTTPException(status_code=400, detail="Acest CUI este deja înregistrat")
+    
+    # Verify CUI with ANAF
+    anaf_result = await verify_cui_anaf(data.cui)
+    
+    if not anaf_result.get("valid"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"CUI invalid: {anaf_result.get('error', 'Verificarea a eșuat')}"
+        )
+    
+    # Use company name from ANAF if available
+    official_name = anaf_result.get("name") or data.company_name
+    
+    company = Company(
+        owner_id=user.user_id,
+        company_name=official_name,
+        cui=data.cui,
+        email=data.email,
+        phone=data.phone,
+        is_verified=True,  # Auto-verified through ANAF
+        verification_date=datetime.now(timezone.utc)
+    )
+    
+    # Store ANAF data
+    company_dict = company.dict()
+    company_dict["anaf_data"] = anaf_result
+    
+    await db.companies.insert_one(company_dict)
+    
+    # Update user as company owner
+    await db.users.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"is_company": True, "company_id": company.id}}
+    )
+    
+    return {
+        "message": "Firma a fost înregistrată și verificată automat prin ANAF!",
+        "company_id": company.id,
+        "company_name": official_name,
+        "anaf_verified": True
+    }
+
+# ==================== ADMIN ROUTES ====================
+
+@api_router.get("/admin/check")
+async def check_admin(user: User = Depends(require_auth)):
+    """Check if user is admin"""
+    return {
+        "is_admin": user.email == ADMIN_EMAIL,
+        "email": user.email,
+        "admin_email": ADMIN_EMAIL
+    }
+
+@api_router.get("/admin/companies")
+async def admin_get_companies(user: User = Depends(require_admin)):
+    """Admin: Get all companies"""
+    companies = await db.companies.find({}, {"_id": 0}).to_list(1000)
+    return companies
+
+@api_router.get("/admin/companies/pending")
+async def admin_get_pending_companies(user: User = Depends(require_admin)):
+    """Admin: Get companies pending verification"""
+    companies = await db.companies.find(
+        {"is_verified": False},
+        {"_id": 0}
+    ).to_list(100)
+    return companies
+
+@api_router.put("/admin/companies/{company_id}/verify")
+async def admin_verify_company(company_id: str, user: User = Depends(require_admin)):
+    """Admin: Verify a company"""
+    result = await db.companies.update_one(
+        {"id": company_id},
+        {"$set": {"is_verified": True, "verification_date": datetime.now(timezone.utc)}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
+    return {"message": "Firma a fost verificată cu succes"}
+
+@api_router.put("/admin/companies/{company_id}/reject")
+async def admin_reject_company(company_id: str, reason: str = "", user: User = Depends(require_admin)):
+    """Admin: Reject a company"""
+    result = await db.companies.update_one(
+        {"id": company_id},
+        {"$set": {"is_rejected": True, "rejection_reason": reason, "rejection_date": datetime.now(timezone.utc)}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
+    return {"message": "Firma a fost respinsă"}
+
+@api_router.delete("/admin/companies/{company_id}")
+async def admin_delete_company(company_id: str, user: User = Depends(require_admin)):
+    """Admin: Delete a company"""
+    # Get company to find owner
+    company = await db.companies.find_one({"id": company_id})
+    if not company:
+        raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
+    
+    # Remove company flag from owner
+    await db.users.update_one(
+        {"user_id": company["owner_id"]},
+        {"$set": {"is_company": False, "company_id": None}}
+    )
+    
+    # Delete company stores
+    await db.company_stores.delete_many({"company_id": company_id})
+    
+    # Delete restaurant entries for this company
+    await db.restaurants.delete_many({"company_id": company_id})
+    
+    # Delete company
+    await db.companies.delete_one({"id": company_id})
+    
+    return {"message": "Firma și toate datele asociate au fost șterse"}
+
+class AdminCompanyCreate(BaseModel):
+    company_name: str
+    cui: str
+    email: str
+    phone: str
+    owner_email: Optional[str] = None  # If provided, assign to existing user
+
+@api_router.post("/admin/companies/create")
+async def admin_create_company(data: AdminCompanyCreate, user: User = Depends(require_admin)):
+    """Admin: Create a company directly (already verified)"""
+    # Check if CUI already exists
+    cui_exists = await db.companies.find_one({"cui": data.cui})
+    if cui_exists:
+        raise HTTPException(status_code=400, detail="Acest CUI este deja înregistrat")
+    
+    # Verify CUI with ANAF
+    anaf_result = await verify_cui_anaf(data.cui)
+    
+    owner_id = None
+    
+    # If owner email provided, find or create user
+    if data.owner_email:
+        existing_user = await db.users.find_one({"email": data.owner_email})
+        if existing_user:
+            owner_id = existing_user["user_id"]
+            # Check if user already has a company
+            if existing_user.get("company_id"):
+                raise HTTPException(status_code=400, detail="Acest utilizator are deja o firmă")
+        else:
+            # Create placeholder user
+            owner_id = f"user_{uuid.uuid4().hex[:12]}"
+            new_user = {
+                "user_id": owner_id,
+                "email": data.owner_email,
+                "name": data.company_name,
+                "picture": None,
+                "phone": data.phone,
+                "address": None,
+                "is_company": True,
+                "company_id": None,  # Will be updated below
+                "created_at": datetime.now(timezone.utc)
+            }
+            await db.users.insert_one(new_user)
+    else:
+        # Admin-owned placeholder
+        owner_id = f"admin_company_{uuid.uuid4().hex[:8]}"
+    
+    # Use ANAF name if valid
+    official_name = data.company_name
+    if anaf_result.get("valid") and anaf_result.get("name"):
+        official_name = anaf_result["name"]
+    
+    company = Company(
+        owner_id=owner_id,
+        company_name=official_name,
+        cui=data.cui,
+        email=data.email,
+        phone=data.phone,
+        is_verified=True,  # Admin-created = verified
+        verification_date=datetime.now(timezone.utc)
+    )
+    
+    company_dict = company.dict()
+    company_dict["anaf_data"] = anaf_result
+    company_dict["created_by_admin"] = True
+    
+    await db.companies.insert_one(company_dict)
+    
+    # Update user with company_id
+    if owner_id and data.owner_email:
+        await db.users.update_one(
+            {"user_id": owner_id},
+            {"$set": {"is_company": True, "company_id": company.id}}
+        )
+    
+    return {
+        "message": "Firma a fost creată cu succes",
+        "company_id": company.id,
+        "company_name": official_name,
+        "anaf_verified": anaf_result.get("valid", False),
+        "owner_id": owner_id
+    }
+
+@api_router.get("/admin/users")
+async def admin_get_users(user: User = Depends(require_admin)):
+    """Admin: Get all users"""
+    users = await db.users.find({}, {"_id": 0}).to_list(1000)
+    return users
+
+@api_router.get("/admin/stats")
+async def admin_get_stats(user: User = Depends(require_admin)):
+    """Admin: Get platform statistics"""
+    total_users = await db.users.count_documents({})
+    total_companies = await db.companies.count_documents({})
+    verified_companies = await db.companies.count_documents({"is_verified": True})
+    pending_companies = await db.companies.count_documents({"is_verified": False})
+    total_restaurants = await db.restaurants.count_documents({})
+    total_reservations = await db.reservations.count_documents({})
+    total_transactions = await db.transactions.count_documents({})
+    
+    return {
+        "total_users": total_users,
+        "total_companies": total_companies,
+        "verified_companies": verified_companies,
+        "pending_companies": pending_companies,
+        "total_restaurants": total_restaurants,
+        "total_reservations": total_reservations,
+        "total_transactions": total_transactions,
+        "transaction_fee_percentage": TRANSACTION_FEE_PERCENTAGE
+    }
+
 # ==================== COMPANY ROUTES ====================
 
 @api_router.post("/companies/register")
