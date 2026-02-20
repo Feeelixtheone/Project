@@ -23,7 +23,8 @@ import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
-type TabType = 'meniu' | 'interior' | 'recenzii';
+type TabType = 'meniu' | 'galerie' | 'recenzii';
+type ViewMode = '2d' | '3d' | 'video';
 
 export default function RestaurantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function RestaurantDetailScreen() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('meniu');
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [isLiked, setIsLiked] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   
