@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 TRANSACTION_FEE_PERCENTAGE = 1.7  # 1.7% fee on purchases
 SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
 SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
+ADMIN_EMAIL = "mutinyretreat37@gmail.com"
+
+# ANAF API for CUI verification
+ANAF_API_URL = "https://webservicesp.anaf.ro/PlatitorTvaRest/api/v8/ws/tva"
 
 # ==================== MODELS ====================
 
