@@ -356,6 +356,74 @@ async def require_auth(request: Request) -> User:
         raise HTTPException(status_code=401, detail="Nu ești autentificat")
     return user
 
+async def require_admin(request: Request) -> User:
+    """Require admin authentication"""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Nu ești autentificat")
+    if user.email != ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Nu ai permisiuni de administrator")
+    return user
+
+async def is_admin(user: User) -> bool:
+    """Check if user is admin"""
+    return user.email == ADMIN_EMAIL
+
+# ==================== ANAF CUI VERIFICATION ====================
+
+async def verify_cui_anaf(cui: str) -> dict:
+    """Verify CUI with ANAF API and get company info"""
+    try:
+        # Clean CUI - remove 'RO' prefix if present
+        clean_cui = cui.upper().replace('RO', '').strip()
+        
+        # Prepare request body for ANAF API
+        today = datetime.now().strftime("%Y-%m-%d")
+        request_body = [{"cui": int(clean_cui), "data": today}]
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                ANAF_API_URL,
+                json=request_body,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("found") and len(data["found"]) > 0:
+                    company_data = data["found"][0]
+                    return {
+                        "valid": True,
+                        "cui": clean_cui,
+                        "name": company_data.get("denumire", ""),
+                        "address": company_data.get("adresa", ""),
+                        "phone": company_data.get("telefon", ""),
+                        "registration_date": company_data.get("data_inregistrare", ""),
+                        "is_tva_payer": company_data.get("scpTVA", False),
+                        "status": company_data.get("statusRO_Activa", ""),
+                        "raw_data": company_data
+                    }
+                else:
+                    return {
+                        "valid": False,
+                        "cui": clean_cui,
+                        "error": "CUI negăsit în baza de date ANAF"
+                    }
+            else:
+                logger.error(f"ANAF API error: {response.status_code}")
+                return {
+                    "valid": False,
+                    "cui": clean_cui,
+                    "error": f"Eroare ANAF API: {response.status_code}"
+                }
+    except Exception as e:
+        logger.error(f"CUI verification error: {e}")
+        return {
+            "valid": False,
+            "cui": cui,
+            "error": str(e)
+        }
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/session")
