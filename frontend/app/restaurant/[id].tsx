@@ -230,9 +230,82 @@ export default function RestaurantDetailScreen() {
 
   const tabs: { key: TabType; label: string }[] = [
     { key: 'meniu', label: 'Meniu' },
-    { key: 'interior', label: 'Interior' },
+    { key: 'galerie', label: 'Galerie' },
     { key: 'recenzii', label: `Recenzii (${reviews.length})` },
   ];
+
+  const viewModes: { key: ViewMode; label: string; icon: string }[] = [
+    { key: '2d', label: '2D', icon: 'images-outline' },
+    { key: '3d', label: '3D', icon: 'cube-outline' },
+    { key: 'video', label: 'Video', icon: 'videocam-outline' },
+  ];
+
+  const renderGalleryContent = () => {
+    if (viewMode === '2d') {
+      // 2D Images - interior images
+      const images = restaurant.interior_images || [];
+      if (images.length === 0) {
+        return (
+          <View style={styles.emptyGallery}>
+            <Ionicons name="images-outline" size={48} color={COLORS.textMuted} />
+            <Text style={styles.emptyGalleryText}>Nu sunt imagini 2D disponibile</Text>
+          </View>
+        );
+      }
+      return (
+        <ScrollView contentContainerStyle={styles.galleryGrid}>
+          {images.map((image: string, index: number) => (
+            <Image key={index} source={{ uri: image }} style={styles.galleryImage} />
+          ))}
+        </ScrollView>
+      );
+    } else if (viewMode === '3d') {
+      // 3D Images
+      const images3d = restaurant.images_3d || [];
+      if (images3d.length === 0) {
+        return (
+          <View style={styles.emptyGallery}>
+            <Ionicons name="cube-outline" size={48} color={COLORS.textMuted} />
+            <Text style={styles.emptyGalleryText}>Nu sunt imagini 3D disponibile</Text>
+            <Text style={styles.emptyGallerySubtext}>
+              Restaurantul nu a încărcat încă imagini 3D ale preparatelor
+            </Text>
+          </View>
+        );
+      }
+      return (
+        <ScrollView contentContainerStyle={styles.galleryGrid}>
+          {images3d.map((image: string, index: number) => (
+            <View key={index} style={styles.image3dContainer}>
+              <Image source={{ uri: image }} style={styles.galleryImage} />
+              <View style={styles.badge3dOverlay}>
+                <Ionicons name="cube" size={16} color={COLORS.text} />
+                <Text style={styles.badge3dText}>3D</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      );
+    } else {
+      // Video
+      const videoUrl = restaurant.video_url;
+      return (
+        <View style={styles.videoContainer}>
+          <View style={styles.videoPlaceholder}>
+            <Ionicons name="videocam" size={64} color={COLORS.textMuted} />
+            <Text style={styles.videoPlaceholderText}>
+              {videoUrl ? 'Video disponibil' : 'Nu există video pentru acest restaurant'}
+            </Text>
+            {videoUrl && (
+              <TouchableOpacity style={styles.playButton}>
+                <Ionicons name="play" size={32} color={COLORS.text} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      );
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
