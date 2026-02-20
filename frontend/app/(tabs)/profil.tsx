@@ -308,6 +308,23 @@ export default function ProfilScreen() {
 
   const renderSettingsTab = () => (
     <View style={styles.tabContent}>
+      {/* Admin Section - Only show if user is admin */}
+      {user?.email === 'mutinyretreat37@gmail.com' && (
+        <TouchableOpacity
+          style={styles.adminBanner}
+          onPress={() => router.push('/admin/dashboard')}
+        >
+          <View style={styles.adminBannerIcon}>
+            <Ionicons name="shield-checkmark" size={24} color={COLORS.success} />
+          </View>
+          <View style={styles.adminBannerContent}>
+            <Text style={styles.adminBannerTitle}>Panou Administrator</Text>
+            <Text style={styles.adminBannerSubtitle}>Gestionează firme și utilizatori</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      )}
+
       {/* Company Section */}
       {company ? (
         <TouchableOpacity
