@@ -413,19 +413,39 @@ export default function RestaurantDetailScreen() {
           />
         )}
 
-        {activeTab === 'interior' && (
-          <ScrollView contentContainerStyle={styles.interiorGrid} showsVerticalScrollIndicator={false}>
-            {restaurant.interior_images.length > 0 ? (
-              restaurant.interior_images.map((image: string, index: number) => (
-                <Image key={index} source={{ uri: image }} style={styles.interiorImage} />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="images-outline" size={48} color={COLORS.textMuted} />
-                <Text style={styles.emptyText}>Nu sunt imagini disponibile</Text>
-              </View>
-            )}
-          </ScrollView>
+        {activeTab === 'galerie' && (
+          <View style={styles.galerieContainer}>
+            {/* View Mode Selector */}
+            <View style={styles.viewModeSelector}>
+              {viewModes.map((mode) => (
+                <TouchableOpacity
+                  key={mode.key}
+                  style={[
+                    styles.viewModeBtn,
+                    viewMode === mode.key && styles.viewModeBtnActive,
+                  ]}
+                  onPress={() => setViewMode(mode.key)}
+                >
+                  <Ionicons
+                    name={mode.icon as any}
+                    size={20}
+                    color={viewMode === mode.key ? COLORS.text : COLORS.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.viewModeText,
+                      viewMode === mode.key && styles.viewModeTextActive,
+                    ]}
+                  >
+                    {mode.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Gallery Content */}
+            {renderGalleryContent()}
+          </View>
         )}
 
         {activeTab === 'recenzii' && (
