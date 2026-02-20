@@ -41,7 +41,7 @@ SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 ADMIN_EMAIL = "mutinyretreat37@gmail.com"
 
 # ANAF API for CUI verification
-ANAF_API_URL = "https://webservicesp.anaf.ro/PlatitorTvaRest/api/v8/ws/tva"
+ANAF_API_URL = "https://webservicesp.anaf.ro/AsynchWebService/api/v8/ws/tva"
 
 # ==================== MODELS ====================
 
