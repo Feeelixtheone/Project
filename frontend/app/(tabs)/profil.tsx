@@ -769,6 +769,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.primary,
   },
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success + '15',
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.success,
+  },
+  adminBannerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.success + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adminBannerContent: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  adminBannerTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  adminBannerSubtitle: {
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
   supportSection: {
     marginTop: SPACING.md,
     paddingHorizontal: SPACING.lg,
