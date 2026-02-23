@@ -416,13 +416,14 @@ class RestaurantAPITester:
             if response.status_code == 200:
                 status_result = response.json()
                 payment_status = status_result.get("payment_status")
-                session_status = status_result.get("session_status")
+                session_status = status_result.get("status")  # Changed from session_status
+                session_id = status_result.get("session_id")
                 
-                if payment_status and session_status:
+                if payment_status and session_status and session_id:
                     self.log(f"✅ Stripe checkout status check passed - Payment: {payment_status}, Session: {session_status}", "SUCCESS")
                     return True
                 else:
-                    self.log(f"❌ Stripe checkout status check failed - missing status info: {status_result}", "ERROR")
+                    self.log(f"❌ Stripe checkout status check failed - missing status info. Got: {list(status_result.keys())}", "ERROR")
                     return False
             else:
                 self.log(f"❌ Stripe checkout status check failed - status: {response.status_code}, response: {response.text}", "ERROR")
