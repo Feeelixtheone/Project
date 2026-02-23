@@ -87,3 +87,36 @@ export const updateUser = (data: any) =>
 // Seed data
 export const seedData = () => 
   apiRequest<any>('/api/seed', { method: 'POST' });
+
+// Stripe Payment APIs
+export const createCheckoutSession = (data: {
+  reservation_type: string;
+  restaurant_id: string;
+  amount: number;
+  origin_url: string;
+  reservation_data?: any;
+}) => apiRequest<any>('/api/payments/checkout/create', { method: 'POST', body: data });
+
+export const getCheckoutStatus = (sessionId: string) =>
+  apiRequest<any>(`/api/payments/checkout/status/${sessionId}`);
+
+export const createReservationWithPayment = (data: {
+  restaurant_id: string;
+  date: string;
+  time: string;
+  guests: number;
+  special_requests?: string;
+  reservation_type: string;
+  ordered_items?: any[];
+  origin_url: string;
+}) => apiRequest<any>('/api/reservations/with-payment', { method: 'POST', body: data });
+
+export const confirmReservationPayment = (reservationId: string, sessionId: string) =>
+  apiRequest<any>(`/api/reservations/${reservationId}/confirm-payment?session_id=${sessionId}`, { method: 'POST' });
+
+export const getMyPaymentTransactions = () =>
+  apiRequest<any[]>('/api/payments/my-transactions');
+
+// Restaurant upfront fee
+export const getUpfrontFee = (restaurantId: string) =>
+  apiRequest<any>(`/api/restaurants/${restaurantId}/upfront-fee`);
