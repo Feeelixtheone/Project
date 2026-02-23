@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Restaurant App
-Tests all backend endpoints with proper authentication flow
+Backend API Testing for Restaurant App - Stripe Payment Integration Focus
+Tests Stripe payment integration endpoints and basic API health
 """
 
 import requests
