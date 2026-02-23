@@ -1,0 +1,228 @@
+<analysis>
+<original_problem_statement>
+The user wants to build a modern, cross-platform (Android/iOS) mobile app for restaurant discovery and reservations.
+
+**Core Features (Initial Request):**
+- **Authentication**: Login and register functionality.
+- **UI**: Advanced, modern UI with Montserrat font.
+- **Navigation**: A bottom slider menu with acasa, restaurante, rezervari, profil, nou, and harta.
+- **Maps**: Google Maps integration to search for addresses.
+
+**Product Requirements (Added during conversation):**
+- **Acasa (Home) Screen**: Display restaurants in modern blocks with photos, reviews, and sorting (popular, sponsored, liked). Sponsored restaurants appear first. Allow users to filter by food categories (Pizza, Sushi, etc.).
+- **Restaurant Details**: When a restaurant is clicked, show its menu, dish photos with price/quantity, and a map popup showing its location and distance. Also, provide options to view the restaurant in 2D, 3D, or via a short video.
+- **Reservations (Rezervari)**:
+    - **Type 1**: Reserve a table and pre-order food. This cannot be canceled within 1 hour of the reservation time.
+    - **Type 2**: Reserve a table with a small upfront fee set by the restaurant, which is deducted from the final bill.
+- **Profile (Profil)**: User settings, payment information, and profile details.
+- **Company Features**:
+    - **Registration**: A separate registration flow for businesses (inregistreaza-te ca firma) using a CUI number (2-10 digits).
+    - **Company Dashboard**: After verification, companies can upload their restaurant details, including images, product sections (e.g., aperitive, pizza), and an optional 50-word description.
+    - **3D Meal Photography**: Ability for companies to photograph their meals in 3D (UI placeholder).
+- **Admin Panel**:
+    - An admin with the email  can monitor companies, modify their details, and add new restaurants without needing verification.
+    - The panel should show new company registration requests for verification.
+- **CUI Verification**: Automatic verification of the CUI number using the ANAF API.
+- **Payments**: A backend system for a payment system. A 1.7% commission should be deduced from each purchase made through the app.
+- **Support**:
+    - A support email for both clients and companies.
+    - An in-app chat assistance feature.
+
+</original_problem_statement>
+
+**User's preferred language**: Romanian. The next agent MUST respond in Romanian.
+
+**what currently exists?**
+A full-stack Expo (React Native) and FastAPI application.
+- **Frontend**: A multi-screen Expo app with  for navigation. It includes a login/registration screen, a tab-based layout for the main features, a company registration form, an admin dashboard, a company dashboard, and a restaurant details screen. State is managed with Zustand and .
+- **Backend**: A FastAPI server with MongoDB. It handles user/company authentication via Emergent Google Auth, provides CRUD APIs for restaurants, categories, and reservations. It includes admin-specific routes, CUI verification logic via an external API (ANAF), and data models for all major features, including recent additions for paid reservations and chat.
+- **Authentication**: Google Social Login is implemented. A special role for 'admin' is assigned if the user's email is .
+
+**Last working item**:
+-   **Last item agent was working**: The agent was starting the implementation of the Chat Assistance feature. It began by creating the necessary backend models () and then created the frontend screen file .
+-   **Status**: IN PROGRESS
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: both
+-   **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+-   **Issue 1**: CUI verification is not working as expected. (Priority: P1)
+
+**Issues Detail**:
+-   **Issue 1**:
+    -   **Description**: The  endpoint, which calls the ANAF (Romanian Tax Authority) API, consistently fails to validate real CUI numbers. The agent fixed an initial 404 error by updating the API URL, but now it returns . This suggests the API call is successful, but the validation logic or the data being sent might be incorrect, or the ANAF endpoint might have limitations.
+    -   **Attempted fixes**: The agent corrected the ANAF API URL from a non-existent one to .
+    -   **Next debug checklist**:
+        -   Verify the format of the POST request sent to the ANAF API in  inside the  function. Check the payload structure and headers against the official ANAF API documentation.
+        -   Test with several different known-valid CUI numbers to rule out a single bad test case.
+        -   Investigate if the ANAF API requires authentication or has a specific test environment.
+        -   Log the full response from the ANAF API, including status code and body, for more detailed error analysis.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical feature for the company registration flow. Fixing it will automate the verification of businesses, which is a core user requirement.
+    -   **Status**: NOT STARTED (since the last fix attempt)
+    -   **Is recurring issue?** N
+    -   **Should Test frontend/backend/both after fix?**: backend
+    -   **Blocked on other issue**: None
+
+**In progress Task List**:
+-   **Task 1**: Complete Chat Assistance Feature (Priority: P0)
+-   **Task 2**: Implement Paid Reservations & Upfront Fees (Priority: P1)
+-   **Task 3**: Build out Admin & Company Dashboards (Priority: P1)
+
+**Task Detail**:
+-   **Task 1**: Complete Chat Assistance Feature
+    -   **Where to resume**:
+        -   **Backend**: In , create API endpoints for the  model. This should include endpoints to post a new message and fetch the chat history for a user.
+        -   **Frontend**: In , build the UI for a chat interface (message list, input box, send button). Connect it to the new backend endpoints.
+        -   **Frontend**: Add a floating chat button or a link in the profile screen to navigate to the support chat.
+    -   **What will be achieved with this?**: Users will have an in-app channel to communicate with support.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on something**: None
+
+-   **Task 2**: Implement Paid Reservations & Upfront Fees
+    -   **Where to resume**:
+        -   **Backend**: The models (, ) and routes () have been updated. These need to be thoroughly tested. The logic to handle payment (even if mocked for now) and cancellation rules (e.g., 1-hour deadline) needs to be implemented.
+        -   **Frontend**: The reservation screen () needs a complete UI overhaul to support the two new reservation types: pre-ordered food and table with upfront fee. This involves creating a form to select the type, choose menu items (if applicable), and proceed to a (mock) payment step.
+    -   **What will be achieved with this?**: Fulfills the user's request for a monetized reservation system.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on something**: A payment integration (upcoming task). For now, it can be mocked.
+
+-   **Task 3**: Build out Admin & Company Dashboards
+    -   **Where to resume**:
+        -   **Admin Dashboard ()**: The file exists but is a placeholder. It needs to be populated with UI to:
+            1.  List companies with a 'pending' status.
+            2.  Buttons to 'Approve' or 'Reject' a company.
+            3.  A form to create a new company/restaurant directly, bypassing verification.
+            4.  A list of all companies with options to view/edit their details.
+        -   **Company Dashboard ()**: Also a placeholder. It needs a UI for business owners to edit their restaurant profile, upload images, manage menu sections, and view their sales/transactions.
+        -   **Backend ()**: Implement the logic for the corresponding admin actions (approving/rejecting companies, editing details) and company actions (updating restaurant info).
+    -   **What will be achieved with this?**: Provides the management tools required by the admin and business owners.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on something**: None
+
+**Upcoming and Future Tasks**
+-   **Upcoming Tasks**:
+    -   **P0: Payment Gateway Integration**: Integrate a real payment provider (e.g., Stripe) to handle reservation fees and user purchases. This involves creating backend endpoints to process payments and updating the frontend to include a payment flow.
+    -   **P1: Implement 1.7% Commission Logic**: In the backend, after a payment is successfully processed, create a  record and calculate the 1.7% commission. This should be associated with the company's account.
+-   **Future Tasks**:
+    -   **P2: Implement 3D/Video Functionality**: The UI toggles exist in . This task involves integrating a library or service for uploading and viewing 3D models and videos.
+    -   **P2: Nou Tab Functionality**: The nou tab exists but its purpose is undefined. Clarify the feature with the user and implement it.
+
+**Completed work in this session**
+-   **Recently completed**:
+    -   Full-stack app structure using Expo and FastAPI.
+    -   Google Authentication with role-based access (user, company, admin).
+    -   File-based routing and bottom tab navigation.
+    -   **Features Implemented**:
+        -   Home screen with restaurant listings and category filters ().
+        -   Company registration flow with CUI field ().
+        -   Admin role assignment based on email ().
+        -   Profile screen with conditional links to Admin/Company dashboards ().
+        -   Restaurant detail screen with UI placeholders for 2D/3D/Video views ().
+        -   Backend CUI verification API call (partially working).
+        -   Created placeholder files for Admin and Company dashboards.
+
+**Earlier issues found/mentioned but not fixed**
+-   **Issue 1**:
+    -   **Description**: The CUI verification via the ANAF API is not working correctly. It reports valid CUIs as not found.
+    -   **Debug checklist**: See All Pending/In progress Issue list section above for the detailed checklist.
+    -   **Why to solve this issue and what will be achieved with this?**: It is a core requirement for automating the business registration process.
+    -   **Should Test frontend/backend/both after fix**: backend
+    -   **Is recurring issue?**: N
+
+**Known issue recurrence from previous fork**
+-   None.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+-   **Frontend**: React Native, Expo, Expo Router (file-based routing), Zustand (state management), , .
+-   **Backend**: FastAPI, Python, MongoDB (via ), Pydantic (data validation).
+-   **Authentication**: Emergent Google Auth, with a custom role-based system (user, company, admin).
+-   **API**: RESTful API built with FastAPI.
+
+**key DB schema**
+-   : 
+-   : 
+-   : 
+-   : 
+-   : 
+
+**changes in tech stack**
+-   None.
+
+**All files of reference**
+-   **/app/backend/server.py**: The single source of all backend logic, including models, routes, and business logic. Has been heavily modified to add all new features.
+-   **/app/frontend/app/index.tsx**: The main entry/login/registration screen. Overwritten to implement the new UI with company registration.
+-   **/app/frontend/app/(tabs)/acasa.tsx**: The home screen. Updated to include category filters.
+-   **/app/frontend/app/(tabs)/profil.tsx**: The user profile screen. Updated to include conditional links to admin/company dashboards and support info.
+-   **/app/frontend/app/restaurant/[id].tsx**: The restaurant detail screen. Updated to add 2D/3D/Video view toggles.
+-   **/app/frontend/app/admin/dashboard.tsx**: (New File) Placeholder for the admin panel.
+-   **/app/frontend/app/company/dashboard.tsx**: (New File) Placeholder for the company dashboard.
+-   **/app/frontend/app/chat/support.tsx**: (New File) Placeholder for the chat support screen.
+-   **/app/frontend/context/AuthContext.tsx**: Contains the Zustand store and authentication logic for the frontend.
+
+**Areas that need refactoring**:
+-   **server.py**: At over 1000 lines, the backend file is becoming monolithic. It should be broken down into multiple files for better organization (e.g., separate files for models, routes per feature, and utility functions).
+
+**key api endpoints**
+-   : Handles Google login.
+-   : Fetches current user profile.
+-   : GET all restaurants.
+-   : GET a specific restaurant.
+-   : GET all food categories.
+-   : POST to create a new reservation.
+-   : POST to register a new company.
+-   : GET to verify a CUI number. (Needs debugging)
+-   : GET all companies (for admin).
+-   : POST to create a company as an admin.
+
+**Critical Info for New Agent**
+-   **Admin Access**: Login with the email  to gain admin privileges. An admin-specific banner and link will appear on the profile screen.
+-   **CUI Verification**: The ANAF API for CUI verification is implemented but not working reliably. This is a high-priority bug to investigate.
+-   **Mocked Features**: Payments, 3D model/video rendering, and commissions are not implemented. The current focus should be on building the UI and backend logic, assuming these can be mocked for now.
+-   **Language**: All user-facing text and communication with the user must be in Romanian.
+
+**documents created in this job**
+-   
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User**: Asks for paid reservations (two types), enhanced admin panel (verify/modify/add companies), and chat assistance. (IN PROGRESS)
+2.  **User**: Asks for an admin panel for  to monitor companies, automatic CUI verification (ANAF), and 2D/3D/video view options on the restaurant page. (COMPLETED - except for CUI bug)
+3.  **User**: Requests to improve the welcome panel with a logo, add company registration with CUI, a company dashboard, 1.7% commission, support email, 3D photo capability, and food category filters. (COMPLETED)
+4.  **User**: Clarifies initial requirements: use placeholders for now, confirms features for all tabs, details what restaurant pages should show (menu, map, price), and confirms the need for a payment system. (COMPLETED)
+5.  **User**: Mentions I added the credits, likely referring to Google Maps API keys, but the agent correctly identified a build error and proceeded to fix that first. (RESOLVED)
+
+**Project Health Check:**
+-   **Broken**:
+    -   CUI Verification: The backend logic for verifying company CUI numbers via the ANAF API is not functioning correctly.
+-   **Mocked**:
+    -   Payment System: No payment gateway is integrated. All payment flows are placeholders.
+    -   3D/Video Viewing: The UI exists to select these views, but no actual rendering is implemented.
+
+**3rd Party Integrations**
+-   **Emergent Google Auth**: Used for user authentication. Uses Emergent LLM Key implicitly.
+-   **ANAF API**: Direct HTTP requests to  for CUI verification. Does not require a key.
+
+**Testing status**
+-   **Testing agent used after significant changes**: YES, backend testing was used.
+-   **Troubleshoot agent used after agent stuck in loop**: NO
+-   **Test files created**: None.
+-   **Known regressions**: None.
+
+**Credentials to test flow:**
+-   **Admin User**: Log in via Google with the email .
+
+**What agent forgot to execute**
+-   The agent created the backend models and started updating routes for the paid reservation system but did not implement the corresponding frontend UI in .
+-   The agent added a 1.7% commission to the user stories but has not implemented the backend logic to calculate or track this.
+-   The agent has not yet implemented the core logic for the chat system (WebSockets or polling) in the backend; only the data model exists.
+
+</analysis>
+<SYS_PROMPT_SEPARATOR>
+<workspace_dir>
+/app
+</workspace_dir>

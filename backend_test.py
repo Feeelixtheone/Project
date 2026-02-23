@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timedelta
 
 # Base URL from frontend .env
-BASE_URL = "https://mealmapper-3.preview.emergentagent.com/api"
+BASE_URL = "https://dish-discover-13.preview.emergentagent.com/api"
 
 class RestaurantAPITester:
     def __init__(self):
