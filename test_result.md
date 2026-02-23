@@ -283,11 +283,13 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Company registration endpoint"
+    - "Company stores CRUD"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -297,3 +299,5 @@ agent_communication:
     message: "Initial implementation complete. Login screen verified via screenshot. Backend API health check and restaurants endpoint working. Need to test auth-protected endpoints and full UI flow."
   - agent: "testing"
     message: "Backend API testing completed successfully. All 12 endpoints tested and working: health check, restaurants (with sorting), single restaurant, reviews, auth flow, reservations CRUD, payment methods, and restaurant likes. Authentication flow works properly with Bearer tokens. Data persistence verified in MongoDB. All backend tasks marked as working=true."
+  - agent: "testing"
+    message: "🎉 STRIPE PAYMENT INTEGRATION TESTING COMPLETED SUCCESSFULLY! All 8 tests passed (8/8). Key findings: ✅ POST /api/payments/checkout/create working - creates Stripe sessions with 1.7% fee calculation ✅ GET /api/payments/checkout/status/{session_id} working - returns payment & session status ✅ POST /api/reservations/with-payment working - creates reservations with Stripe payment integration ✅ POST /api/webhook/stripe accessible for Stripe callbacks ✅ Authentication properly protects endpoints (401 for unauthorized) ✅ 1.7% platform fee calculated correctly in all payment flows. Stripe integration using sk_test_emergent test key is fully functional."
