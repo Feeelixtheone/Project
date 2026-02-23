@@ -331,25 +331,213 @@ class RestaurantAPITester:
             self.log(f"❌ Toggle like failed - error: {str(e)}", "ERROR")
             return False
     
-    def test_payment_methods(self):
-        """Test payment methods endpoint"""
-        if not self.session_token:
-            self.log("❌ No session token available for payment methods testing", "ERROR")
-            return False
-            
-        self.log("Testing get payment methods endpoint...")
+    def test_stripe_checkout_create_unauthenticated(self):
+        """Test Stripe checkout creation without authentication (should fail with 401)"""
+        self.log("Testing Stripe checkout creation (unauthenticated)...")
         try:
-            headers = {"Authorization": f"Bearer {self.session_token}"}
-            response = requests.get(f"{BASE_URL}/payment-methods", headers=headers, timeout=10)
-            if response.status_code == 200:
-                methods = response.json()
-                self.log(f"✅ Get payment methods passed - found {len(methods)} methods", "SUCCESS")
+            checkout_data = {
+                "amount": 100.0,
+                "currency": "ron",
+                "success_url": "https://example.com/success",
+                "cancel_url": "https://example.com/cancel"
+            }
+            
+            response = requests.post(f"{BASE_URL}/payments/checkout/create", 
+                                   json=checkout_data, 
+                                   timeout=10)
+            
+            if response.status_code == 401:
+                self.log("✅ Stripe checkout (unauthenticated) correctly returned 401", "SUCCESS")
                 return True
             else:
-                self.log(f"❌ Get payment methods failed - status: {response.status_code}", "ERROR")
+                self.log(f"❌ Stripe checkout (unauthenticated) failed - expected 401 but got: {response.status_code}", "ERROR")
                 return False
         except Exception as e:
-            self.log(f"❌ Get payment methods failed - error: {str(e)}", "ERROR")
+            self.log(f"❌ Stripe checkout (unauthenticated) failed - error: {str(e)}", "ERROR")
+            return False
+    
+    def test_stripe_checkout_create(self):
+        """Test Stripe checkout session creation"""
+        if not self.session_token:
+            self.log("❌ No session token available for Stripe checkout testing", "ERROR")
+            return False
+            
+        self.log("Testing Stripe checkout session creation...")
+        try:
+            headers = {"Authorization": f"Bearer {self.session_token}", "Content-Type": "application/json"}
+            checkout_data = {
+                "amount": 100.0,
+                "currency": "ron",
+                "success_url": "https://dish-discover-13.preview.emergentagent.com/success",
+                "cancel_url": "https://dish-discover-13.preview.emergentagent.com/cancel",
+                "metadata": {
+                    "reservation_id": "test_reservation_123",
+                    "user_id": self.user_id
+                }
+            }
+            
+            response = requests.post(f"{BASE_URL}/payments/checkout/create", 
+                                   headers=headers,
+                                   json=checkout_data, 
+                                   timeout=15)
+            
+            if response.status_code == 200:
+                result = response.json()
+                session_id = result.get("session_id")
+                checkout_url = result.get("checkout_url")
+                
+                if session_id and checkout_url:
+                    self.log(f"✅ Stripe checkout creation passed - Session ID: {session_id[:20]}...", "SUCCESS")
+                    self.stripe_session_id = session_id
+                    return True
+                else:
+                    self.log(f"❌ Stripe checkout creation failed - missing session_id or checkout_url: {result}", "ERROR")
+                    return False
+            else:
+                self.log(f"❌ Stripe checkout creation failed - status: {response.status_code}, response: {response.text}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"❌ Stripe checkout creation failed - error: {str(e)}", "ERROR")
+            return False
+    
+    def test_stripe_checkout_status(self):
+        """Test Stripe checkout status check"""
+        if not hasattr(self, 'stripe_session_id') or not self.stripe_session_id:
+            self.log("❌ No Stripe session ID available for status testing", "ERROR")
+            return False
+            
+        self.log(f"Testing Stripe checkout status check...")
+        try:
+            response = requests.get(f"{BASE_URL}/payments/checkout/status/{self.stripe_session_id}", 
+                                  timeout=10)
+            
+            if response.status_code == 200:
+                status_result = response.json()
+                payment_status = status_result.get("payment_status")
+                session_status = status_result.get("session_status")
+                
+                if payment_status and session_status:
+                    self.log(f"✅ Stripe checkout status check passed - Payment: {payment_status}, Session: {session_status}", "SUCCESS")
+                    return True
+                else:
+                    self.log(f"❌ Stripe checkout status check failed - missing status info: {status_result}", "ERROR")
+                    return False
+            else:
+                self.log(f"❌ Stripe checkout status check failed - status: {response.status_code}, response: {response.text}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"❌ Stripe checkout status check failed - error: {str(e)}", "ERROR")
+            return False
+    
+    def test_reservations_with_payment_unauthenticated(self):
+        """Test reservation with payment without authentication (should fail with 401)"""
+        self.log("Testing reservation with payment (unauthenticated)...")
+        try:
+            reservation_data = {
+                "restaurant_id": "test_restaurant",
+                "date": "2025-02-20",
+                "time": "19:00",
+                "guests": 2,
+                "reservation_type": "table_only"
+            }
+            
+            response = requests.post(f"{BASE_URL}/reservations/with-payment", 
+                                   json=reservation_data, 
+                                   timeout=10)
+            
+            if response.status_code == 401:
+                self.log("✅ Reservation with payment (unauthenticated) correctly returned 401", "SUCCESS")
+                return True
+            else:
+                self.log(f"❌ Reservation with payment (unauthenticated) failed - expected 401 but got: {response.status_code}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"❌ Reservation with payment (unauthenticated) failed - error: {str(e)}", "ERROR")
+            return False
+    
+    def test_reservations_with_payment(self):
+        """Test reservation creation with Stripe payment"""
+        if not self.session_token or not self.test_restaurant_id:
+            self.log("❌ Missing session token or restaurant ID for payment reservation testing", "ERROR")
+            return False
+            
+        self.log("Testing reservation creation with Stripe payment...")
+        try:
+            headers = {"Authorization": f"Bearer {self.session_token}", "Content-Type": "application/json"}
+            reservation_data = {
+                "restaurant_id": self.test_restaurant_id,
+                "date": "2025-02-20",
+                "time": "19:00",
+                "guests": 2,
+                "special_requests": "Table with view please",
+                "reservation_type": "table_only",
+                "payment_required": True
+            }
+            
+            response = requests.post(f"{BASE_URL}/reservations/with-payment", 
+                                   headers=headers, 
+                                   json=reservation_data, 
+                                   timeout=15)
+            
+            if response.status_code == 200:
+                result = response.json()
+                reservation = result.get("reservation")
+                payment_info = result.get("payment_info")
+                
+                if reservation and payment_info:
+                    platform_fee = payment_info.get("platform_fee", 0)
+                    total_paid = payment_info.get("total_paid", 0)
+                    
+                    self.log(f"✅ Reservation with payment passed - Fee: {platform_fee} RON, Total: {total_paid} RON", "SUCCESS")
+                    self.test_reservation_id = reservation.get("id")
+                    return True
+                else:
+                    self.log(f"❌ Reservation with payment failed - missing reservation or payment info: {result}", "ERROR")
+                    return False
+            else:
+                self.log(f"❌ Reservation with payment failed - status: {response.status_code}, response: {response.text}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"❌ Reservation with payment failed - error: {str(e)}", "ERROR")
+            return False
+    
+    def test_stripe_webhook_unauthenticated(self):
+        """Test Stripe webhook endpoint (should accept POST without authentication)"""
+        self.log("Testing Stripe webhook endpoint...")
+        try:
+            webhook_data = {
+                "id": "evt_test_webhook",
+                "object": "event",
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_test_session",
+                        "payment_status": "paid",
+                        "metadata": {
+                            "reservation_id": "test_reservation_123"
+                        }
+                    }
+                }
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Stripe-Signature": "t=1234567890,v1=test_signature"
+            }
+            
+            response = requests.post(f"{BASE_URL}/webhook/stripe", 
+                                   headers=headers,
+                                   json=webhook_data, 
+                                   timeout=10)
+            
+            if response.status_code in [200, 400]:  # 400 is acceptable for invalid signature
+                self.log(f"✅ Stripe webhook endpoint accessible - status: {response.status_code}", "SUCCESS")
+                return True
+            else:
+                self.log(f"❌ Stripe webhook endpoint failed - status: {response.status_code}, response: {response.text}", "ERROR")
+                return False
+        except Exception as e:
+            self.log(f"❌ Stripe webhook endpoint failed - error: {str(e)}", "ERROR")
             return False
     
     def run_all_tests(self):
