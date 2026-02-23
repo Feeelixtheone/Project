@@ -264,7 +264,13 @@ class ReviewCreate(BaseModel):
     rating: int
     comment: str
 
-# Reservation Models
+# Reservation Models - Enhanced with two types
+class ReservationItem(BaseModel):
+    menu_item_id: str
+    name: str
+    price: float
+    quantity: int
+
 class Reservation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     restaurant_id: str
@@ -276,7 +282,21 @@ class Reservation(BaseModel):
     time: str
     guests: int
     special_requests: Optional[str] = None
-    status: str = "pending"  # pending, confirmed, cancelled
+    # Reservation type: "food_ready" (mâncare gata) or "table_only" (doar masă)
+    reservation_type: str = "table_only"
+    # For food_ready: ordered items
+    ordered_items: List[ReservationItem] = []
+    # Payment details
+    food_total: float = 0.0  # Total for pre-ordered food
+    upfront_fee: float = 0.0  # Upfront fee for table_only
+    platform_fee: float = 0.0  # 1.7% platform fee
+    total_paid: float = 0.0  # Total amount paid
+    is_paid: bool = False
+    payment_method_id: Optional[str] = None
+    # Cancellation rules: food_ready cannot be cancelled within 1 hour
+    can_cancel: bool = True
+    cancellation_deadline: Optional[datetime] = None
+    status: str = "pending"  # pending, confirmed, cancelled, completed
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ReservationCreate(BaseModel):
@@ -285,6 +305,32 @@ class ReservationCreate(BaseModel):
     time: str
     guests: int
     special_requests: Optional[str] = None
+    reservation_type: str = "table_only"  # "food_ready" or "table_only"
+    ordered_items: List[dict] = []  # [{menu_item_id, quantity}]
+    payment_method_id: Optional[str] = None
+
+# Chat/Support Models
+class ChatMessage(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str
+    sender_type: str  # "user", "admin", "system"
+    sender_id: str
+    sender_name: str
+    message: str
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ChatConversation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_name: str
+    user_email: str
+    subject: str
+    status: str = "open"  # open, resolved, closed
+    last_message: Optional[str] = None
+    unread_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Payment Models
 class PaymentMethod(BaseModel):
