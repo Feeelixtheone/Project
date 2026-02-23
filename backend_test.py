@@ -359,21 +359,22 @@ class RestaurantAPITester:
     
     def test_stripe_checkout_create(self):
         """Test Stripe checkout session creation"""
-        if not self.session_token:
-            self.log("❌ No session token available for Stripe checkout testing", "ERROR")
+        if not self.session_token or not self.test_restaurant_id:
+            self.log("❌ No session token or restaurant ID available for Stripe checkout testing", "ERROR")
             return False
             
         self.log("Testing Stripe checkout session creation...")
         try:
             headers = {"Authorization": f"Bearer {self.session_token}", "Content-Type": "application/json"}
             checkout_data = {
+                "reservation_type": "table_only",
+                "restaurant_id": self.test_restaurant_id,
                 "amount": 100.0,
-                "currency": "ron",
-                "success_url": "https://dish-discover-13.preview.emergentagent.com/success",
-                "cancel_url": "https://dish-discover-13.preview.emergentagent.com/cancel",
-                "metadata": {
-                    "reservation_id": "test_reservation_123",
-                    "user_id": self.user_id
+                "origin_url": "https://dish-discover-13.preview.emergentagent.com",
+                "reservation_data": {
+                    "date": "2025-02-20",
+                    "time": "19:00",
+                    "guests": 2
                 }
             }
             
