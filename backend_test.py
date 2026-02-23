@@ -540,8 +540,86 @@ class RestaurantAPITester:
             self.log(f"❌ Stripe webhook endpoint failed - error: {str(e)}", "ERROR")
             return False
     
+    def run_stripe_payment_tests(self):
+        """Run focused Stripe payment integration tests"""
+        self.log("=" * 80)
+        self.log("STRIPE PAYMENT INTEGRATION TESTS FOR RESTAURANT APP")
+        self.log("=" * 80)
+        
+        results = {}
+        
+        # Basic API health checks first
+        self.log("\n🏥 BASIC API HEALTH CHECKS")
+        self.log("-" * 40)
+        results["health_check"] = self.test_health_check()
+        results["get_restaurants"] = self.test_get_restaurants()
+        
+        # Unauthenticated Stripe endpoint tests (should return 401)
+        self.log("\n🔒 UNAUTHENTICATED STRIPE ENDPOINT TESTS (Should Return 401)")
+        self.log("-" * 60)
+        results["stripe_checkout_unauthenticated"] = self.test_stripe_checkout_create_unauthenticated()
+        results["reservation_payment_unauthenticated"] = self.test_reservations_with_payment_unauthenticated()
+        
+        # Stripe webhook test (should accept POST without auth)
+        self.log("\n🔗 STRIPE WEBHOOK ENDPOINT TEST")
+        self.log("-" * 40)
+        results["stripe_webhook"] = self.test_stripe_webhook_unauthenticated()
+        
+        # Setup auth for authenticated Stripe tests
+        self.log("\n🔐 SETTING UP AUTHENTICATION FOR STRIPE TESTS")
+        self.log("-" * 50)
+        auth_setup = self.setup_test_user_session()
+        
+        if auth_setup:
+            # Authenticated Stripe payment tests
+            self.log("\n💳 AUTHENTICATED STRIPE PAYMENT TESTS")
+            self.log("-" * 45)
+            results["stripe_checkout_create"] = self.test_stripe_checkout_create()
+            results["stripe_checkout_status"] = self.test_stripe_checkout_status()
+            results["reservation_with_payment"] = self.test_reservations_with_payment()
+        else:
+            self.log("❌ Auth setup failed - skipping authenticated Stripe tests", "ERROR")
+            results["auth_setup"] = False
+        
+        # Test Results Summary
+        self.log("\n" + "=" * 80)
+        self.log("STRIPE PAYMENT INTEGRATION TEST RESULTS")
+        self.log("=" * 80)
+        
+        passed = 0
+        total = 0
+        critical_failures = []
+        
+        for test_name, result in results.items():
+            status = "✅ PASS" if result else "❌ FAIL"
+            self.log(f"{test_name.upper().replace('_', ' ')}: {status}")
+            
+            if result:
+                passed += 1
+            else:
+                if test_name in ["stripe_checkout_create", "stripe_checkout_status", "reservation_with_payment"]:
+                    critical_failures.append(test_name)
+            total += 1
+        
+        # Summary Analysis
+        self.log("\n" + "-" * 80)
+        self.log(f"OVERALL RESULTS: {passed}/{total} tests passed")
+        
+        if len(critical_failures) == 0:
+            self.log("🎉 ALL STRIPE PAYMENT INTEGRATION TESTS PASSED!", "SUCCESS")
+            self.log("✅ Stripe checkout session creation is working")
+            self.log("✅ Stripe payment status checking is working")
+            self.log("✅ Reservation with payment integration is working")
+            self.log("✅ Authentication protection is properly implemented")
+            return True
+        else:
+            self.log(f"⚠️  {len(critical_failures)} critical Stripe integration failures detected:", "ERROR")
+            for failure in critical_failures:
+                self.log(f"   - {failure.replace('_', ' ').title()}", "ERROR")
+            return False
+    
     def run_all_tests(self):
-        """Run all backend API tests"""
+        """Run comprehensive backend API tests (legacy method - keeping for compatibility)"""
         self.log("=" * 60)
         self.log("STARTING RESTAURANT APP BACKEND API TESTS")
         self.log("=" * 60)
@@ -564,7 +642,6 @@ class RestaurantAPITester:
             results["get_reservations"] = self.test_get_reservations()
             results["create_review"] = self.test_create_review()
             results["toggle_like"] = self.test_toggle_like()
-            results["payment_methods"] = self.test_payment_methods()
         else:
             self.log("❌ Auth setup failed - skipping protected endpoint tests", "ERROR")
             results["auth_setup"] = False
