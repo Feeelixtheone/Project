@@ -1830,6 +1830,416 @@ async def get_my_transactions(user: User = Depends(require_auth)):
     ).sort("created_at", -1).to_list(100)
     return transactions
 
+# ==================== STRIPE PAYMENT ====================
+
+# Payment request models
+class CreateCheckoutRequest(BaseModel):
+    reservation_type: str  # "food_ready" or "table_only"
+    restaurant_id: str
+    amount: float  # Total amount to charge
+    origin_url: str  # Frontend origin for redirects
+    reservation_data: Optional[Dict] = None  # Additional reservation info
+
+class PaymentTransaction(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    session_id: str
+    reservation_id: Optional[str] = None
+    restaurant_id: str
+    amount: float
+    currency: str = "ron"
+    platform_fee: float
+    status: str = "initiated"  # initiated, pending, paid, failed, expired
+    payment_status: str = "pending"
+    metadata: Dict = {}
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+@api_router.post("/payments/checkout/create")
+async def create_checkout_session(
+    request: Request,
+    data: CreateCheckoutRequest,
+    user: User = Depends(require_auth)
+):
+    """Create a Stripe checkout session for reservation payment"""
+    try:
+        # Get restaurant info
+        restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
+        if not restaurant:
+            raise HTTPException(status_code=404, detail="Restaurant negăsit")
+        
+        # Calculate platform fee (1.7%)
+        platform_fee = round(data.amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+        total_amount = round(data.amount + platform_fee, 2)
+        
+        # Initialize Stripe
+        host_url = str(request.base_url).rstrip('/')
+        webhook_url = f"{host_url}/api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        # Build success/cancel URLs from frontend origin
+        success_url = f"{data.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{data.origin_url}/payment/cancel"
+        
+        # Metadata for tracking
+        metadata = {
+            "user_id": user.user_id,
+            "user_email": user.email,
+            "restaurant_id": data.restaurant_id,
+            "restaurant_name": restaurant["name"],
+            "reservation_type": data.reservation_type,
+            "platform_fee": str(platform_fee),
+            "original_amount": str(data.amount)
+        }
+        
+        # Create checkout session
+        checkout_request = CheckoutSessionRequest(
+            amount=float(total_amount),
+            currency="ron",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=metadata
+        )
+        
+        session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Store payment transaction in DB
+        payment_tx = PaymentTransaction(
+            user_id=user.user_id,
+            session_id=session.session_id,
+            restaurant_id=data.restaurant_id,
+            amount=total_amount,
+            currency="ron",
+            platform_fee=platform_fee,
+            status="initiated",
+            payment_status="pending",
+            metadata=metadata
+        )
+        await db.payment_transactions.insert_one(payment_tx.dict())
+        
+        return {
+            "checkout_url": session.url,
+            "session_id": session.session_id,
+            "amount": data.amount,
+            "platform_fee": platform_fee,
+            "total": total_amount,
+            "currency": "RON"
+        }
+        
+    except Exception as e:
+        logger.error(f"Stripe checkout error: {e}")
+        raise HTTPException(status_code=500, detail=f"Eroare la procesarea plății: {str(e)}")
+
+@api_router.get("/payments/checkout/status/{session_id}")
+async def get_checkout_status(session_id: str, request: Request):
+    """Get payment status and update database"""
+    try:
+        # Initialize Stripe
+        host_url = str(request.base_url).rstrip('/')
+        webhook_url = f"{host_url}/api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        # Get status from Stripe
+        status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Find existing transaction
+        existing_tx = await db.payment_transactions.find_one(
+            {"session_id": session_id},
+            {"_id": 0}
+        )
+        
+        if existing_tx:
+            # Only update if not already processed as paid
+            if existing_tx.get("payment_status") != "paid":
+                new_status = "paid" if status.payment_status == "paid" else status.status
+                new_payment_status = status.payment_status
+                
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {
+                        "$set": {
+                            "status": new_status,
+                            "payment_status": new_payment_status,
+                            "updated_at": datetime.now(timezone.utc)
+                        }
+                    }
+                )
+                
+                # If payment successful, create/confirm reservation
+                if new_payment_status == "paid" and not existing_tx.get("reservation_confirmed"):
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {"$set": {"reservation_confirmed": True}}
+                    )
+        
+        return {
+            "session_id": session_id,
+            "status": status.status,
+            "payment_status": status.payment_status,
+            "amount_total": status.amount_total,
+            "currency": status.currency,
+            "metadata": status.metadata
+        }
+        
+    except Exception as e:
+        logger.error(f"Payment status check error: {e}")
+        raise HTTPException(status_code=500, detail=f"Eroare la verificarea plății: {str(e)}")
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        host_url = str(request.base_url).rstrip('/')
+        webhook_url = f"{host_url}/api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        if webhook_response.payment_status == "paid":
+            # Update transaction
+            await db.payment_transactions.update_one(
+                {"session_id": webhook_response.session_id},
+                {
+                    "$set": {
+                        "status": "paid",
+                        "payment_status": "paid",
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                }
+            )
+        
+        return {"received": True}
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"received": True}  # Always return 200 to Stripe
+
+@api_router.get("/payments/my-transactions")
+async def get_my_payment_transactions(user: User = Depends(require_auth)):
+    """Get user's payment transactions"""
+    transactions = await db.payment_transactions.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return transactions
+
+# ==================== RESERVATION WITH PAYMENT ====================
+
+class ReservationWithPaymentRequest(BaseModel):
+    restaurant_id: str
+    date: str
+    time: str
+    guests: int
+    special_requests: Optional[str] = None
+    reservation_type: str = "table_only"  # "food_ready" or "table_only"
+    ordered_items: List[dict] = []  # [{menu_item_id, quantity}]
+    origin_url: str  # For Stripe redirects
+
+@api_router.post("/reservations/with-payment")
+async def create_reservation_with_payment(
+    request: Request,
+    data: ReservationWithPaymentRequest,
+    user: User = Depends(require_auth)
+):
+    """Create a reservation and initiate Stripe payment"""
+    restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    # Calculate food total if food_ready reservation
+    food_total = 0.0
+    ordered_items = []
+    
+    if data.reservation_type == "food_ready" and data.ordered_items:
+        menu_items = {item["id"]: item for item in restaurant.get("menu", [])}
+        for order in data.ordered_items:
+            menu_item = menu_items.get(order.get("menu_item_id"))
+            if menu_item:
+                item_total = menu_item["price"] * order.get("quantity", 1)
+                food_total += item_total
+                ordered_items.append({
+                    "menu_item_id": menu_item["id"],
+                    "name": menu_item["name"],
+                    "price": menu_item["price"],
+                    "quantity": order.get("quantity", 1)
+                })
+    
+    # Get upfront fee for table_only reservations
+    upfront_fee = 0.0
+    if data.reservation_type == "table_only":
+        upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
+    
+    # Determine payment amount
+    base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
+    platform_fee = round(base_amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    total_to_pay = round(base_amount + platform_fee, 2)
+    
+    # Calculate cancellation deadline for food_ready (1 hour before)
+    cancellation_deadline = None
+    can_cancel = True
+    if data.reservation_type == "food_ready":
+        try:
+            reservation_datetime = datetime.strptime(f"{data.date} {data.time}", "%Y-%m-%d %H:%M")
+            reservation_datetime = reservation_datetime.replace(tzinfo=timezone.utc)
+            cancellation_deadline = reservation_datetime - timedelta(hours=1)
+            can_cancel = datetime.now(timezone.utc) < cancellation_deadline
+        except:
+            pass
+    
+    # Create reservation with pending payment status
+    reservation = Reservation(
+        restaurant_id=data.restaurant_id,
+        restaurant_name=restaurant["name"],
+        user_id=user.user_id,
+        user_name=user.name,
+        user_email=user.email,
+        date=data.date,
+        time=data.time,
+        guests=data.guests,
+        special_requests=data.special_requests,
+        reservation_type=data.reservation_type,
+        ordered_items=ordered_items,
+        food_total=food_total,
+        upfront_fee=upfront_fee,
+        platform_fee=platform_fee,
+        total_paid=total_to_pay,
+        is_paid=False,
+        can_cancel=can_cancel,
+        cancellation_deadline=cancellation_deadline,
+        status="pending_payment"
+    )
+    await db.reservations.insert_one(reservation.dict())
+    
+    # Create Stripe checkout session
+    host_url = str(request.base_url).rstrip('/')
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    success_url = f"{data.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}&reservation_id={reservation.id}"
+    cancel_url = f"{data.origin_url}/payment/cancel?reservation_id={reservation.id}"
+    
+    metadata = {
+        "user_id": user.user_id,
+        "user_email": user.email,
+        "reservation_id": reservation.id,
+        "restaurant_id": data.restaurant_id,
+        "restaurant_name": restaurant["name"],
+        "reservation_type": data.reservation_type,
+        "platform_fee": str(platform_fee)
+    }
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=float(total_to_pay),
+        currency="ron",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata
+    )
+    
+    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Store payment transaction
+    payment_tx = PaymentTransaction(
+        user_id=user.user_id,
+        session_id=session.session_id,
+        reservation_id=reservation.id,
+        restaurant_id=data.restaurant_id,
+        amount=total_to_pay,
+        currency="ron",
+        platform_fee=platform_fee,
+        status="initiated",
+        payment_status="pending",
+        metadata=metadata
+    )
+    await db.payment_transactions.insert_one(payment_tx.dict())
+    
+    # Update reservation with session_id
+    await db.reservations.update_one(
+        {"id": reservation.id},
+        {"$set": {"payment_session_id": session.session_id}}
+    )
+    
+    return {
+        "reservation": reservation.dict(),
+        "payment": {
+            "checkout_url": session.url,
+            "session_id": session.session_id,
+            "base_amount": base_amount,
+            "platform_fee": platform_fee,
+            "total": total_to_pay,
+            "currency": "RON"
+        },
+        "cancellation_info": {
+            "can_cancel": can_cancel,
+            "deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
+            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Taxa în avans va fi dedusă din nota finală."
+        }
+    }
+
+@api_router.post("/reservations/{reservation_id}/confirm-payment")
+async def confirm_reservation_payment(
+    reservation_id: str,
+    session_id: str,
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Confirm payment and activate reservation"""
+    reservation = await db.reservations.find_one(
+        {"id": reservation_id, "user_id": user.user_id},
+        {"_id": 0}
+    )
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Rezervare negăsită")
+    
+    # Check payment status
+    host_url = str(request.base_url).rstrip('/')
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+    
+    if status.payment_status == "paid":
+        # Update reservation as confirmed
+        await db.reservations.update_one(
+            {"id": reservation_id},
+            {
+                "$set": {
+                    "is_paid": True,
+                    "status": "confirmed",
+                    "payment_confirmed_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        # Update payment transaction
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {
+                "$set": {
+                    "status": "paid",
+                    "payment_status": "paid",
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "Plata a fost confirmată! Rezervarea ta este acum activă.",
+            "reservation_id": reservation_id,
+            "status": "confirmed"
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Plata nu a fost finalizată încă.",
+            "payment_status": status.payment_status,
+            "reservation_id": reservation_id
+        }
+
 # ==================== SUPPORT ====================
 
 @api_router.get("/support/info")
