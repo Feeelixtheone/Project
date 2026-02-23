@@ -733,17 +733,67 @@ async def get_reservations(user: User = Depends(require_auth)):
         {"user_id": user.user_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
-    return [Reservation(**r) for r in reservations]
+    
+    # Update can_cancel status based on time
+    now = datetime.now(timezone.utc)
+    for r in reservations:
+        if r.get("reservation_type") == "food_ready" and r.get("cancellation_deadline"):
+            deadline = r["cancellation_deadline"]
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            r["can_cancel"] = now < deadline
+    
+    return reservations
 
-@api_router.post("/reservations", response_model=Reservation)
+@api_router.post("/reservations")
 async def create_reservation(
     data: ReservationCreate,
     user: User = Depends(require_auth)
 ):
-    """Create a reservation"""
+    """Create a reservation with payment"""
     restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    # Calculate food total if food_ready reservation
+    food_total = 0.0
+    ordered_items = []
+    
+    if data.reservation_type == "food_ready" and data.ordered_items:
+        menu_items = {item["id"]: item for item in restaurant.get("menu", [])}
+        for order in data.ordered_items:
+            menu_item = menu_items.get(order.get("menu_item_id"))
+            if menu_item:
+                item_total = menu_item["price"] * order.get("quantity", 1)
+                food_total += item_total
+                ordered_items.append({
+                    "menu_item_id": menu_item["id"],
+                    "name": menu_item["name"],
+                    "price": menu_item["price"],
+                    "quantity": order.get("quantity", 1)
+                })
+    
+    # Get upfront fee for table_only reservations
+    upfront_fee = 0.0
+    if data.reservation_type == "table_only":
+        upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
+    
+    # Calculate platform fee (1.7%)
+    base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
+    platform_fee = round(base_amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    total_paid = round(base_amount + platform_fee, 2)
+    
+    # Calculate cancellation deadline for food_ready (1 hour before)
+    cancellation_deadline = None
+    can_cancel = True
+    if data.reservation_type == "food_ready":
+        try:
+            reservation_datetime = datetime.strptime(f"{data.date} {data.time}", "%Y-%m-%d %H:%M")
+            reservation_datetime = reservation_datetime.replace(tzinfo=timezone.utc)
+            cancellation_deadline = reservation_datetime - timedelta(hours=1)
+            can_cancel = datetime.now(timezone.utc) < cancellation_deadline
+        except:
+            pass
     
     reservation = Reservation(
         restaurant_id=data.restaurant_id,
@@ -754,10 +804,35 @@ async def create_reservation(
         date=data.date,
         time=data.time,
         guests=data.guests,
-        special_requests=data.special_requests
+        special_requests=data.special_requests,
+        reservation_type=data.reservation_type,
+        ordered_items=ordered_items,
+        food_total=food_total,
+        upfront_fee=upfront_fee,
+        platform_fee=platform_fee,
+        total_paid=total_paid,
+        is_paid=True if data.payment_method_id else False,
+        payment_method_id=data.payment_method_id,
+        can_cancel=can_cancel,
+        cancellation_deadline=cancellation_deadline,
+        status="confirmed" if data.payment_method_id else "pending"
     )
     await db.reservations.insert_one(reservation.dict())
-    return reservation
+    
+    return {
+        "reservation": reservation.dict(),
+        "payment_summary": {
+            "reservation_type": data.reservation_type,
+            "food_total": food_total,
+            "upfront_fee": upfront_fee,
+            "platform_fee": platform_fee,
+            "platform_fee_percentage": TRANSACTION_FEE_PERCENTAGE,
+            "total_paid": total_paid,
+            "can_cancel": can_cancel,
+            "cancellation_deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
+            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Taxa în avans va fi dedusă din nota finală."
+        }
+    }
 
 @api_router.put("/reservations/{reservation_id}/cancel")
 async def cancel_reservation(
@@ -765,13 +840,182 @@ async def cancel_reservation(
     user: User = Depends(require_auth)
 ):
     """Cancel a reservation"""
-    result = await db.reservations.update_one(
+    reservation = await db.reservations.find_one(
         {"id": reservation_id, "user_id": user.user_id},
-        {"$set": {"status": "cancelled"}}
+        {"_id": 0}
+    )
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Rezervare negăsită")
+    
+    # Check if can cancel for food_ready reservations
+    if reservation.get("reservation_type") == "food_ready":
+        deadline = reservation.get("cancellation_deadline")
+        if deadline:
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline)
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= deadline:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Nu poți anula această rezervare cu mai puțin de 1 oră înainte. Mâncarea este deja în preparare."
+                )
+    
+    await db.reservations.update_one(
+        {"id": reservation_id},
+        {"$set": {"status": "cancelled", "can_cancel": False}}
+    )
+    
+    # TODO: Process refund if needed
+    refund_amount = 0
+    if reservation.get("is_paid"):
+        if reservation.get("reservation_type") == "table_only":
+            refund_amount = reservation.get("upfront_fee", 0)
+        # For food_ready, no refund if within 1 hour
+    
+    return {
+        "message": "Rezervare anulată",
+        "refund_amount": refund_amount,
+        "refund_note": "Suma va fi returnată în 3-5 zile lucrătoare." if refund_amount > 0 else None
+    }
+
+@api_router.get("/restaurants/{restaurant_id}/upfront-fee")
+async def get_upfront_fee(restaurant_id: str):
+    """Get restaurant's upfront fee for table reservations"""
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    return {
+        "upfront_fee": restaurant.get("upfront_fee", 20.0),
+        "currency": "RON",
+        "note": "Această sumă va fi dedusă din nota finală."
+    }
+
+# ==================== CHAT/SUPPORT ROUTES ====================
+
+@api_router.post("/chat/conversations")
+async def create_conversation(
+    subject: str,
+    message: str,
+    user: User = Depends(require_auth)
+):
+    """Start a new support conversation"""
+    conversation = ChatConversation(
+        user_id=user.user_id,
+        user_name=user.name,
+        user_email=user.email,
+        subject=subject,
+        last_message=message[:100] + "..." if len(message) > 100 else message
+    )
+    await db.chat_conversations.insert_one(conversation.dict())
+    
+    # Add initial message
+    chat_message = ChatMessage(
+        conversation_id=conversation.id,
+        sender_type="user",
+        sender_id=user.user_id,
+        sender_name=user.name,
+        message=message
+    )
+    await db.chat_messages.insert_one(chat_message.dict())
+    
+    return {
+        "conversation": conversation.dict(),
+        "message": chat_message.dict()
+    }
+
+@api_router.get("/chat/conversations")
+async def get_my_conversations(user: User = Depends(require_auth)):
+    """Get user's support conversations"""
+    conversations = await db.chat_conversations.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("updated_at", -1).to_list(50)
+    return conversations
+
+@api_router.get("/chat/conversations/{conversation_id}/messages")
+async def get_conversation_messages(conversation_id: str, user: User = Depends(require_auth)):
+    """Get messages in a conversation"""
+    # Verify user owns conversation or is admin
+    conversation = await db.chat_conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversație negăsită")
+    
+    if conversation["user_id"] != user.user_id and user.email != ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Nu ai acces la această conversație")
+    
+    messages = await db.chat_messages.find(
+        {"conversation_id": conversation_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
+    
+    # Mark as read
+    await db.chat_messages.update_many(
+        {"conversation_id": conversation_id, "sender_type": {"$ne": "user"}},
+        {"$set": {"is_read": True}}
+    )
+    
+    return messages
+
+@api_router.post("/chat/conversations/{conversation_id}/messages")
+async def send_message(
+    conversation_id: str,
+    message: str,
+    user: User = Depends(require_auth)
+):
+    """Send a message in a conversation"""
+    conversation = await db.chat_conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversație negăsită")
+    
+    if conversation["user_id"] != user.user_id and user.email != ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Nu ai acces la această conversație")
+    
+    sender_type = "admin" if user.email == ADMIN_EMAIL else "user"
+    
+    chat_message = ChatMessage(
+        conversation_id=conversation_id,
+        sender_type=sender_type,
+        sender_id=user.user_id,
+        sender_name=user.name,
+        message=message
+    )
+    await db.chat_messages.insert_one(chat_message.dict())
+    
+    # Update conversation
+    await db.chat_conversations.update_one(
+        {"id": conversation_id},
+        {
+            "$set": {
+                "last_message": message[:100] + "..." if len(message) > 100 else message,
+                "updated_at": datetime.now(timezone.utc)
+            },
+            "$inc": {"unread_count": 1}
+        }
+    )
+    
+    return chat_message.dict()
+
+@api_router.get("/admin/chat/conversations")
+async def admin_get_all_conversations(user: User = Depends(require_admin)):
+    """Admin: Get all support conversations"""
+    conversations = await db.chat_conversations.find(
+        {},
+        {"_id": 0}
+    ).sort("updated_at", -1).to_list(200)
+    return conversations
+
+@api_router.put("/admin/chat/conversations/{conversation_id}/resolve")
+async def admin_resolve_conversation(conversation_id: str, user: User = Depends(require_admin)):
+    """Admin: Mark conversation as resolved"""
+    result = await db.chat_conversations.update_one(
+        {"id": conversation_id},
+        {"$set": {"status": "resolved"}}
     )
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Rezervare negăsită")
-    return {"message": "Rezervare anulată"}
+        raise HTTPException(status_code=404, detail="Conversație negăsită")
+    return {"message": "Conversație rezolvată"}
 
 # ==================== PAYMENT ROUTES ====================
 
