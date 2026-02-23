@@ -18,6 +18,7 @@ class RestaurantAPITester:
         self.user_id = None
         self.test_restaurant_id = None
         self.test_reservation_id = None
+        self.stripe_session_id = None
         
     def log(self, message, status="INFO"):
         timestamp = datetime.now().strftime("%H:%M:%S")
