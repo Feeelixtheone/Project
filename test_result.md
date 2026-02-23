@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Build Android/iOS app with login/register, bottom navigation (acasa, restaurante, rezervari, profil, nou, harta), Google Maps integration, modern UI with Montserrat font, Romanian language. ENHANCED: Company registration with CUI, food categories, 1.7% transaction fee, support emails, 3D photos"
+user_problem_statement: "Build Android/iOS app with login/register, bottom navigation (acasa, restaurante, rezervari, profil, nou, harta), Google Maps integration, modern UI with Montserrat font, Romanian language. ENHANCED: Company registration with CUI, food categories, 1.7% transaction fee, support emails, 3D photos, Stripe payment integration"
 
 backend:
   - task: "Health check endpoint"
@@ -140,6 +140,42 @@ backend:
       - working: true
         agent: "main"
         comment: "GET /api/support/info returns support emails and 1.7% fee info"
+
+  - task: "Stripe payment checkout"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/payments/checkout/create creates Stripe checkout session, GET /api/payments/checkout/status/{session_id} checks payment status"
+
+  - task: "Reservations with Stripe payment"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/reservations/with-payment creates reservation and initiates Stripe payment with 1.7% platform fee"
+
+  - task: "Stripe webhook handler"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/webhook/stripe handles Stripe payment webhooks"
 
   - task: "Company registration endpoint"
     implemented: true
