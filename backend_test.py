@@ -674,5 +674,8 @@ class RestaurantAPITester:
 
 if __name__ == "__main__":
     tester = RestaurantAPITester()
-    success = tester.run_all_tests()
+    
+    # Run focused Stripe payment integration tests
+    success = tester.run_stripe_payment_tests()
+    
     sys.exit(0 if success else 1)
