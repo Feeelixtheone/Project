@@ -120,3 +120,19 @@ export const getMyPaymentTransactions = () =>
 // Restaurant upfront fee
 export const getUpfrontFee = (restaurantId: string) =>
   apiRequest<any>(`/api/restaurants/${restaurantId}/upfront-fee`);
+
+// Direct Orders (Cart checkout)
+export const createDirectOrder = (data: {
+  restaurant_id: string;
+  items: Array<{
+    menu_item_id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image_url?: string;
+  }>;
+  origin_url: string;
+}) => apiRequest<any>('/api/orders/create', { method: 'POST', body: data });
+
+export const getMyOrders = () =>
+  apiRequest<any[]>('/api/orders/my');
