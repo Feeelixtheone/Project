@@ -509,23 +509,19 @@ export default function RezervariScreen() {
               {/* Date & Time */}
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: SPACING.sm }]}>
-                  <Text style={styles.formLabel}>Data *</Text>
-                  <TextInput
-                    style={styles.formInput}
+                  <DatePicker
+                    label="Data *"
                     value={reservationDate}
-                    onChangeText={setReservationDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={COLORS.textMuted}
+                    onChange={setReservationDate}
+                    placeholder="Selectează data"
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={styles.formLabel}>Ora *</Text>
-                  <TextInput
-                    style={styles.formInput}
+                  <TimePicker
+                    label="Ora *"
                     value={reservationTime}
-                    onChangeText={setReservationTime}
-                    placeholder="HH:MM"
-                    placeholderTextColor={COLORS.textMuted}
+                    onChange={setReservationTime}
+                    placeholder="Selectează ora"
                   />
                 </View>
               </View>
