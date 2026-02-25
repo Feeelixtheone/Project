@@ -309,6 +309,30 @@ export default function ProfilScreen() {
 
   const renderSettingsTab = () => (
     <View style={styles.tabContent}>
+      {/* Quick Access - Cart & Kids */}
+      <View style={styles.quickAccessRow}>
+        <TouchableOpacity
+          style={styles.quickAccessCard}
+          onPress={() => router.push('/cart')}
+        >
+          <View style={[styles.quickAccessIcon, { backgroundColor: '#FF6B3520' }]}>
+            <Ionicons name="cart" size={24} color="#FF6B35" />
+          </View>
+          <Text style={styles.quickAccessTitle}>Coșul meu</Text>
+          <Text style={styles.quickAccessSub}>{useCartStore.getState().getItemCount()} produse</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickAccessCard}
+          onPress={() => router.push('/kids')}
+        >
+          <View style={[styles.quickAccessIcon, { backgroundColor: '#FFD60A20' }]}>
+            <Ionicons name="happy" size={24} color="#FFD60A" />
+          </View>
+          <Text style={styles.quickAccessTitle}>Zona Copii</Text>
+          <Text style={styles.quickAccessSub}>Minijocuri</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Admin Section - Only show if user is admin */}
       {user?.email === 'mutinyretreat37@gmail.com' && (
         <TouchableOpacity
