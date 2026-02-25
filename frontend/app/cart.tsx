@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,30 +7,26 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ActivityIndicator,
-  Linking,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
-import { useCartStore } from '../src/stores/cartStore';
-import { useAuth } from '../src/context/AuthContext';
-import { apiRequest } from '../src/utils/api';
+import { useCartStore, CartItem } from '../src/stores/cartStore';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const PLATFORM_FEE = 1.7;
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const { items, removeItem, updateQuantity, clearCart, clearRestaurantItems } = useCartStore();
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const items = useCartStore((s) => s.items);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const clearRestaurantItems = useCartStore((s) => s.clearRestaurantItems);
 
   // Group items by restaurant
   const groupedItems = useMemo(() => {
-    const groups: Record<string, { restaurantId: string; restaurantName: string; items: typeof items }> = {};
+    const groups: Record<string, { restaurantId: string; restaurantName: string; items: CartItem[] }> = {};
     items.forEach((item) => {
       if (!groups[item.restaurantId]) {
         groups[item.restaurantId] = {
@@ -44,59 +40,52 @@ export default function CartScreen() {
     return Object.values(groups);
   }, [items]);
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const platformFee = Math.round(subtotal * (PLATFORM_FEE / 100) * 100) / 100;
-  const total = Math.round((subtotal + platformFee) * 100) / 100;
-
-  const handleCheckout = async (restaurantId: string) => {
-    if (!user) {
-      Alert.alert('Autentificare necesară', 'Trebuie să fii autentificat pentru a plasa o comandă.');
-      return;
-    }
-
-    const restaurantItems = items.filter((i) => i.restaurantId === restaurantId);
-    if (restaurantItems.length === 0) return;
-
-    setIsCheckingOut(true);
-    try {
-      const originUrl = BACKEND_URL || (Platform.OS === 'web' ? window?.location?.origin : 'https://app.local') || 'https://app.local';
-      const result = await apiRequest<any>('/api/orders/create', {
-        method: 'POST',
-        body: {
-          restaurant_id: restaurantId,
-          items: restaurantItems.map((item) => ({
-            menu_item_id: item.menuItemId,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            image_url: item.imageUrl,
-          })),
-          origin_url: originUrl,
-        },
-      });
-
-      if (result.payment?.checkout_url) {
-        // Clear items for this restaurant after successful checkout initiation
-        clearRestaurantItems(restaurantId);
-        const supported = await Linking.canOpenURL(result.payment.checkout_url);
-        if (supported) {
-          await Linking.openURL(result.payment.checkout_url);
-        } else {
-          Alert.alert('Succes', 'Comanda a fost creată! Verifică email-ul pentru link-ul de plată.');
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Eroare', error.message || 'Nu s-a putut plasa comanda.');
-    } finally {
-      setIsCheckingOut(false);
-    }
-  };
-
   const handleRemoveItem = (menuItemId: string, restaurantId: string, name: string) => {
     Alert.alert('Șterge din coș', `Vrei să scoți "${name}" din coș?`, [
       { text: 'Nu', style: 'cancel' },
-      { text: 'Da', style: 'destructive', onPress: () => removeItem(menuItemId, restaurantId) },
+      {
+        text: 'Da',
+        style: 'destructive',
+        onPress: () => {
+          removeItem(menuItemId, restaurantId);
+        },
+      },
     ]);
+  };
+
+  const handleCheckout = (restaurantId: string, restaurantName: string) => {
+    const restaurantItems = items.filter((i) => i.restaurantId === restaurantId);
+    if (restaurantItems.length === 0) return;
+
+    Alert.alert(
+      'Comandă cu mâncare gata pregătită',
+      'Dacă plătești acum, vei opta pentru opțiunea cu mâncare gata pregătită. Vei fi redirecționat la pagina de rezervări pentru a finaliza comanda.',
+      [
+        { text: 'Anulează', style: 'cancel' },
+        {
+          text: 'Continuă',
+          onPress: () => {
+            // Navigate to rezervari tab with pre-selected items
+            router.push({
+              pathname: '/(tabs)/rezervari',
+              params: {
+                prefill_restaurant_id: restaurantId,
+                prefill_restaurant_name: restaurantName,
+                prefill_items: JSON.stringify(
+                  restaurantItems.map((item) => ({
+                    menu_item_id: item.menuItemId,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                  }))
+                ),
+                prefill_type: 'food_ready',
+              },
+            });
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -112,7 +101,7 @@ export default function CartScreen() {
             onPress={() =>
               Alert.alert('Golește coșul', 'Vrei să golești tot coșul?', [
                 { text: 'Nu', style: 'cancel' },
-                { text: 'Da', style: 'destructive', onPress: clearCart },
+                { text: 'Da', style: 'destructive', onPress: () => clearCart() },
               ])
             }
           >
@@ -154,16 +143,22 @@ export default function CartScreen() {
                     <View style={styles.quantityControls}>
                       <TouchableOpacity
                         style={styles.qtyBtn}
-                        onPress={() => updateQuantity(item.menuItemId, item.restaurantId, item.quantity - 1)}
+                        onPress={() => {
+                          if (item.quantity <= 1) {
+                            removeItem(item.menuItemId, item.restaurantId);
+                          } else {
+                            updateQuantity(item.menuItemId, item.restaurantId, item.quantity - 1);
+                          }
+                        }}
                       >
-                        <Ionicons name="remove" size={16} color={COLORS.text} />
+                        <Ionicons name={item.quantity <= 1 ? "trash" : "remove"} size={14} color={item.quantity <= 1 ? COLORS.error : COLORS.text} />
                       </TouchableOpacity>
                       <Text style={styles.qtyText}>{item.quantity}</Text>
                       <TouchableOpacity
                         style={styles.qtyBtn}
                         onPress={() => updateQuantity(item.menuItemId, item.restaurantId, item.quantity + 1)}
                       >
-                        <Ionicons name="add" size={16} color={COLORS.text} />
+                        <Ionicons name="add" size={14} color={COLORS.text} />
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.itemTotal}>{(item.price * item.quantity).toFixed(2)}</Text>
@@ -192,19 +187,20 @@ export default function CartScreen() {
                   </View>
                 </View>
 
+                {/* Info message */}
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle" size={18} color={COLORS.primary} />
+                  <Text style={styles.infoText}>
+                    Dacă plătești acum, vei opta pentru opțiunea cu mâncare gata pregătită.
+                  </Text>
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.checkoutBtn, isCheckingOut && styles.checkoutBtnDisabled]}
-                  onPress={() => handleCheckout(group.restaurantId)}
-                  disabled={isCheckingOut}
+                  style={styles.checkoutBtn}
+                  onPress={() => handleCheckout(group.restaurantId, group.restaurantName)}
                 >
-                  {isCheckingOut ? (
-                    <ActivityIndicator color={COLORS.text} />
-                  ) : (
-                    <>
-                      <Ionicons name="card" size={20} color={COLORS.text} />
-                      <Text style={styles.checkoutBtnText}>Comandă și plătește</Text>
-                    </>
-                  )}
+                  <Ionicons name="card" size={20} color={COLORS.text} />
+                  <Text style={styles.checkoutBtnText}>Comandă și plătește</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -258,16 +254,29 @@ const styles = StyleSheet.create({
   qtyText: { fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.text, marginHorizontal: SPACING.sm },
   itemTotal: { fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.primary, minWidth: 50, textAlign: 'right' },
   removeBtn: { marginLeft: SPACING.xs },
-  groupSummary: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.sm,
-  },
+  groupSummary: { marginTop: SPACING.md, paddingTop: SPACING.sm },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   summaryLabel: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary },
   summaryValue: { fontFamily: FONTS.medium, fontSize: 13, color: COLORS.text },
   totalRow: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.xs, paddingTop: SPACING.sm },
   totalLabel: { fontFamily: FONTS.bold, fontSize: 16, color: COLORS.text },
   totalValue: { fontFamily: FONTS.bold, fontSize: 18, color: COLORS.primary },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary + '15',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.md,
+  },
+  infoText: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: COLORS.primary,
+    lineHeight: 18,
+  },
   checkoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -278,6 +287,5 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.md,
   },
-  checkoutBtnDisabled: { backgroundColor: COLORS.surfaceLight },
   checkoutBtnText: { fontFamily: FONTS.semiBold, fontSize: 16, color: COLORS.text },
 });
