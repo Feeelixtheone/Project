@@ -118,18 +118,18 @@ export function DatePicker({ value, onChange, placeholder = 'Selectează data', 
                   key={index}
                   style={[
                     styles.dayCell,
-                    day && isSelected(day) && styles.dayCellSelected,
-                    day && isPast(day) && styles.dayCellPast,
+                    day !== null && isSelected(day) ? styles.dayCellSelected : undefined,
+                    day !== null && isPast(day) ? styles.dayCellPast : undefined,
                   ]}
-                  onPress={() => day && selectDay(day)}
-                  disabled={!day || isPast(day)}
+                  onPress={() => day !== null && selectDay(day)}
+                  disabled={day === null || isPast(day)}
                 >
-                  {day && (
+                  {day !== null && (
                     <Text
                       style={[
                         styles.dayText,
-                        isSelected(day) && styles.dayTextSelected,
-                        isPast(day) && styles.dayTextPast,
+                        isSelected(day) ? styles.dayTextSelected : undefined,
+                        isPast(day) ? styles.dayTextPast : undefined,
                       ]}
                     >
                       {day}
