@@ -309,29 +309,20 @@ export default function ProfilScreen() {
 
   const renderSettingsTab = () => (
     <View style={styles.tabContent}>
-      {/* Quick Access - Cart & Kids */}
-      <View style={styles.quickAccessRow}>
-        <TouchableOpacity
-          style={styles.quickAccessCard}
-          onPress={() => router.push('/cart')}
-        >
-          <View style={[styles.quickAccessIcon, { backgroundColor: '#FF6B3520' }]}>
-            <Ionicons name="cart" size={24} color="#FF6B35" />
-          </View>
+      {/* Quick Access - Cart */}
+      <TouchableOpacity
+        style={styles.quickAccessCardFull}
+        onPress={() => router.push('/cart')}
+      >
+        <View style={[styles.quickAccessIcon, { backgroundColor: '#FF6B3520' }]}>
+          <Ionicons name="cart" size={24} color="#FF6B35" />
+        </View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.quickAccessTitle}>Coșul meu</Text>
-          <Text style={styles.quickAccessSub}>Produsele tale</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickAccessCard}
-          onPress={() => router.push('/kids')}
-        >
-          <View style={[styles.quickAccessIcon, { backgroundColor: '#FFD60A20' }]}>
-            <Ionicons name="happy" size={24} color="#FFD60A" />
-          </View>
-          <Text style={styles.quickAccessTitle}>Zona Copii</Text>
-          <Text style={styles.quickAccessSub}>Minijocuri</Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.quickAccessSub}>Vezi produsele din coș</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+      </TouchableOpacity>
 
       {/* Admin Section - Only show if user is admin */}
       {user?.email === 'mutinyretreat37@gmail.com' && (
