@@ -1830,6 +1830,126 @@ async def get_my_transactions(user: User = Depends(require_auth)):
     ).sort("created_at", -1).to_list(100)
     return transactions
 
+# ==================== DIRECT ORDERS (CART CHECKOUT) ====================
+
+class DirectOrderItemModel(BaseModel):
+    menu_item_id: str
+    name: str
+    price: float
+    quantity: int
+    image_url: Optional[str] = None
+
+class DirectOrderCreate(BaseModel):
+    restaurant_id: str
+    items: List[DirectOrderItemModel]
+    origin_url: str
+
+@api_router.post("/orders/create")
+async def create_direct_order(
+    request: Request,
+    data: DirectOrderCreate,
+    user: User = Depends(require_auth)
+):
+    """Create a direct food order from cart with Stripe payment"""
+    restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Coșul este gol")
+    
+    # Calculate totals
+    subtotal = sum(item.price * item.quantity for item in data.items)
+    platform_fee = round(subtotal * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    total = round(subtotal + platform_fee, 2)
+    
+    # Create order record
+    order_id = str(uuid.uuid4())
+    order = {
+        "id": order_id,
+        "user_id": user.user_id,
+        "user_name": user.name,
+        "user_email": user.email,
+        "restaurant_id": data.restaurant_id,
+        "restaurant_name": restaurant["name"],
+        "items": [item.dict() for item in data.items],
+        "subtotal": subtotal,
+        "platform_fee": platform_fee,
+        "total": total,
+        "status": "pending_payment",
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.orders.insert_one(order)
+    
+    # Create Stripe checkout session
+    host_url = str(request.base_url).rstrip('/')
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    success_url = f"{data.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order_id}"
+    cancel_url = f"{data.origin_url}/payment/cancel?order_id={order_id}"
+    
+    metadata = {
+        "user_id": user.user_id,
+        "user_email": user.email,
+        "order_id": order_id,
+        "restaurant_id": data.restaurant_id,
+        "restaurant_name": restaurant["name"],
+        "type": "direct_order",
+        "platform_fee": str(platform_fee)
+    }
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=float(total),
+        currency="ron",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata
+    )
+    
+    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Update order with session info
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"stripe_session_id": session.session_id}}
+    )
+    
+    # Store payment transaction
+    payment_tx = PaymentTransaction(
+        user_id=user.user_id,
+        session_id=session.session_id,
+        restaurant_id=data.restaurant_id,
+        amount=total,
+        currency="ron",
+        platform_fee=platform_fee,
+        status="initiated",
+        payment_status="pending",
+        metadata=metadata
+    )
+    await db.payment_transactions.insert_one(payment_tx.dict())
+    
+    return {
+        "order": order,
+        "payment": {
+            "checkout_url": session.url,
+            "session_id": session.session_id,
+            "subtotal": subtotal,
+            "platform_fee": platform_fee,
+            "total": total,
+            "currency": "RON"
+        }
+    }
+
+@api_router.get("/orders/my")
+async def get_my_orders(user: User = Depends(require_auth)):
+    """Get user's direct orders"""
+    orders = await db.orders.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return orders
+
 # ==================== STRIPE PAYMENT ====================
 
 # Payment request models
