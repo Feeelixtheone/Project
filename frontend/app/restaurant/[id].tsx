@@ -44,6 +44,7 @@ export default function RestaurantDetailScreen() {
   
   // Modals
   const [showReservationModal, setShowReservationModal] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   
