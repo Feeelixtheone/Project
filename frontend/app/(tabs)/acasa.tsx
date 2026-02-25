@@ -194,15 +194,25 @@ export default function AcasaScreen() {
           <Text style={styles.greeting}>Bună, {user?.name?.split(' ')[0] || 'Utilizator'}!</Text>
           <Text style={styles.subGreeting}>Ce ai poftă să mănânci azi?</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
-          {user?.picture ? (
-            <Image source={{ uri: user.picture }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={24} color={COLORS.textSecondary} />
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.cartHeaderBtn} onPress={() => router.push('/cart')}>
+            <Ionicons name="cart-outline" size={24} color={COLORS.text} />
+            {useCartStore.getState().getItemCount() > 0 && (
+              <View style={styles.cartHeaderBadge}>
+                <Text style={styles.cartHeaderBadgeText}>{useCartStore.getState().getItemCount()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
+            {user?.picture ? (
+              <Image source={{ uri: user.picture }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={24} color={COLORS.textSecondary} />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Bar */}
