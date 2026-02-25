@@ -700,6 +700,102 @@ export default function RestaurantDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Menu Item Detail Modal */}
+      <Modal
+        visible={selectedMenuItem !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedMenuItem(null)}
+      >
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailCard}>
+            <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setSelectedMenuItem(null)}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+            
+            {selectedMenuItem && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image source={{ uri: selectedMenuItem.image_url }} style={styles.detailImage} />
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailName}>{selectedMenuItem.name}</Text>
+                  <Text style={styles.detailDescription}>{selectedMenuItem.description}</Text>
+                  
+                  <View style={styles.detailMetaRow}>
+                    <View style={styles.detailMeta}>
+                      <Ionicons name="restaurant-outline" size={16} color={COLORS.textSecondary} />
+                      <Text style={styles.detailMetaText}>{selectedMenuItem.quantity}</Text>
+                    </View>
+                    <Text style={styles.detailPrice}>{selectedMenuItem.price?.toFixed(2)} RON</Text>
+                  </View>
+
+                  {/* Nutritional Info */}
+                  {selectedMenuItem.kcal && (
+                    <View style={styles.nutritionSection}>
+                      <Text style={styles.nutritionTitle}>Valori nutriționale</Text>
+                      <View style={styles.nutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Ionicons name="flame" size={20} color="#FF6B35" />
+                          <Text style={styles.nutritionValue}>{selectedMenuItem.kcal}</Text>
+                          <Text style={styles.nutritionLabel}>kcal</Text>
+                        </View>
+                        {selectedMenuItem.protein != null && (
+                          <View style={styles.nutritionItem}>
+                            <Ionicons name="barbell" size={20} color="#00B4D8" />
+                            <Text style={styles.nutritionValue}>{selectedMenuItem.protein}g</Text>
+                            <Text style={styles.nutritionLabel}>Proteine</Text>
+                          </View>
+                        )}
+                        {selectedMenuItem.carbs != null && (
+                          <View style={styles.nutritionItem}>
+                            <Ionicons name="leaf" size={20} color="#66BB6A" />
+                            <Text style={styles.nutritionValue}>{selectedMenuItem.carbs}g</Text>
+                            <Text style={styles.nutritionLabel}>Carbohidrați</Text>
+                          </View>
+                        )}
+                        {selectedMenuItem.fats != null && (
+                          <View style={styles.nutritionItem}>
+                            <Ionicons name="water" size={20} color="#FFD60A" />
+                            <Text style={styles.nutritionValue}>{selectedMenuItem.fats}g</Text>
+                            <Text style={styles.nutritionLabel}>Grăsimi</Text>
+                          </View>
+                        )}
+                        {selectedMenuItem.fiber != null && (
+                          <View style={styles.nutritionItem}>
+                            <Ionicons name="nutrition" size={20} color="#AB47BC" />
+                            <Text style={styles.nutritionValue}>{selectedMenuItem.fiber}g</Text>
+                            <Text style={styles.nutritionLabel}>Fibre</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Allergens */}
+                  {selectedMenuItem.allergens && selectedMenuItem.allergens.length > 0 && (
+                    <View style={styles.allergensSection}>
+                      <Text style={styles.allergensTitle}>Alergeni</Text>
+                      <View style={styles.allergensRow}>
+                        {selectedMenuItem.allergens.map((a: string, i: number) => (
+                          <View key={i} style={styles.allergenTag}>
+                            <Ionicons name="warning" size={12} color={COLORS.error} />
+                            <Text style={styles.allergenText}>{a}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity style={styles.detailCartBtn} onPress={() => { handleAddToCart(selectedMenuItem); setSelectedMenuItem(null); }}>
+                    <Ionicons name="cart" size={20} color={COLORS.text} />
+                    <Text style={styles.detailCartBtnText}>Adaugă în coș</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
