@@ -132,18 +132,27 @@ export default function AcasaScreen() {
         selectedCategory === item.id && styles.categoryItemActive,
       ]}
       onPress={() => {
-        setSelectedCategory(item.id);
-        if (item.id !== 'exclusive') setExclusiveSubcategory('all_exclusive');
+        if (item.id === 'exclusive') {
+          setSelectedCategory('exclusive');
+          setShowExclusiveSheet(true);
+        } else {
+          setSelectedCategory(item.id);
+          setExclusiveSubcategory('all_exclusive');
+        }
       }}
     >
       <View style={[
         styles.categoryIconContainer,
         selectedCategory === item.id && styles.categoryIconContainerActive,
+        item.id === 'exclusive' && styles.categoryIconExclusive,
+        item.id === 'exclusive' && selectedCategory === 'exclusive' && styles.categoryIconExclusiveActive,
       ]}>
         <Ionicons
-          name={item.icon as any}
+          name={item.id === 'exclusive' ? 'diamond' : item.icon as any}
           size={24}
-          color={selectedCategory === item.id ? COLORS.text : COLORS.primary}
+          color={item.id === 'exclusive' 
+            ? (selectedCategory === 'exclusive' ? COLORS.background : COLORS.gold)
+            : (selectedCategory === item.id ? COLORS.text : COLORS.primary)}
         />
       </View>
       <Text
