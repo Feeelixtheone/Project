@@ -114,7 +114,10 @@ export default function AcasaScreen() {
         styles.categoryItem,
         selectedCategory === item.id && styles.categoryItemActive,
       ]}
-      onPress={() => setSelectedCategory(item.id)}
+      onPress={() => {
+        setSelectedCategory(item.id);
+        if (item.id !== 'exclusive') setExclusiveSubcategory('all_exclusive');
+      }}
     >
       <View style={[
         styles.categoryIconContainer,
