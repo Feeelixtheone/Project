@@ -17,6 +17,7 @@ import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { getRestaurants, seedData, toggleLike, apiRequest } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { useCartStore } from '../../src/stores/cartStore';
 
 const { width } = Dimensions.get('window');
 
