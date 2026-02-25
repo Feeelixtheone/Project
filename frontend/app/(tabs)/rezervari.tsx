@@ -26,6 +26,7 @@ import {
   createReservationWithPayment 
 } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
+import { DatePicker, TimePicker } from '../../src/components/DateTimePicker';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
