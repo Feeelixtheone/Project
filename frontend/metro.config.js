@@ -19,6 +19,9 @@ config.cacheStores = [
 // // Alternative: use a more aggressive exclusion pattern
 // config.resolver.blacklistRE = /node_modules\/.*\/(android|ios|windows|macos|__tests__|\.git|.*\.android\.js|.*\.ios\.js)$/;
 
+// Fix for Expo SDK 54 package exports causing import.meta errors on web
+config.resolver.unstable_enablePackageExports = false;
+
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 2;
 
