@@ -141,18 +141,35 @@ export default function AcasaScreen() {
     </TouchableOpacity>
   );
 
-  const renderRestaurantCard = ({ item }: { item: any }) => (
+  const renderRestaurantCard = ({ item }: { item: any }) => {
+    const isExclusive = item.categories?.includes('exclusive');
+    return (
     <TouchableOpacity
-      style={styles.restaurantCard}
+      style={[
+        styles.restaurantCard,
+        isExclusive && styles.restaurantCardExclusive,
+      ]}
       onPress={() => router.push(`/restaurant/${item.id}`)}
       activeOpacity={0.9}
     >
+      {/* Exclusive Glow Border */}
+      {isExclusive && (
+        <View style={styles.exclusiveGlowBorder} />
+      )}
       {/* Cover Image */}
       <View style={styles.imageContainer}>
         <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
         
+        {/* Exclusive Badge */}
+        {isExclusive && (
+          <View style={styles.exclusiveBadge}>
+            <Ionicons name="diamond" size={12} color={COLORS.background} />
+            <Text style={styles.exclusiveBadgeText}>EXCLUSIVE</Text>
+          </View>
+        )}
+        
         {/* Sponsored Badge */}
-        {item.is_sponsored && (
+        {item.is_sponsored && !isExclusive && (
           <View style={styles.sponsoredBadge}>
             <Ionicons name="star" size={12} color={COLORS.background} />
             <Text style={styles.sponsoredText}>SPONSORIZAT</Text>
