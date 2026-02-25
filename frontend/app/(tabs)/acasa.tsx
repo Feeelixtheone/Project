@@ -302,37 +302,45 @@ export default function AcasaScreen() {
         />
       </View>
 
-      {/* Exclusive Sub-filters */}
-      {selectedCategory === 'exclusive' && (
-        <View style={styles.exclusiveSubBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.lg }}>
+      {/* Exclusive Sub-filters - Bottom Sheet Modal */}
+      <Modal visible={showExclusiveSheet} transparent animationType="slide">
+        <TouchableOpacity style={styles.exclusiveSheetOverlay} activeOpacity={1} onPress={() => setShowExclusiveSheet(false)}>
+          <View style={styles.exclusiveSheetContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.exclusiveSheetHandle} />
+            <Text style={styles.exclusiveSheetTitle}>Filtre Exclusive</Text>
             {EXCLUSIVE_SUBCATEGORIES.map((sub) => (
               <TouchableOpacity
                 key={sub.id}
                 style={[
-                  styles.exclusiveSubBtn,
-                  exclusiveSubcategory === sub.id && styles.exclusiveSubBtnActive,
+                  styles.exclusiveSheetItem,
+                  exclusiveSubcategory === sub.id && styles.exclusiveSheetItemActive,
                 ]}
-                onPress={() => setExclusiveSubcategory(sub.id)}
+                onPress={() => {
+                  setExclusiveSubcategory(sub.id);
+                  setShowExclusiveSheet(false);
+                }}
               >
-                <Ionicons
-                  name={sub.icon as any}
-                  size={14}
-                  color={exclusiveSubcategory === sub.id ? COLORS.background : COLORS.gold}
-                />
-                <Text
-                  style={[
-                    styles.exclusiveSubText,
-                    exclusiveSubcategory === sub.id && styles.exclusiveSubTextActive,
-                  ]}
-                >
+                <View style={[styles.exclusiveSheetIconCircle, { backgroundColor: (exclusiveSubcategory === sub.id ? COLORS.gold : COLORS.surfaceLight) }]}>
+                  <Ionicons
+                    name={sub.icon as any}
+                    size={22}
+                    color={exclusiveSubcategory === sub.id ? COLORS.background : COLORS.gold}
+                  />
+                </View>
+                <Text style={[
+                  styles.exclusiveSheetItemText,
+                  exclusiveSubcategory === sub.id && styles.exclusiveSheetItemTextActive,
+                ]}>
                   {sub.name}
                 </Text>
+                {exclusiveSubcategory === sub.id && (
+                  <Ionicons name="checkmark-circle" size={22} color={COLORS.gold} />
+                )}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
-      )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Sort Options */}
       <View style={styles.sortContainer}>
