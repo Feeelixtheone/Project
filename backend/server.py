@@ -1108,6 +1108,7 @@ async def seed_data():
             "is_sponsored": True,
             "is_new": False,
             "cuisine_type": "Românesc",
+            "categories": ["exclusive", "fine_dining"],
             "price_range": "$$",
             "opening_hours": "10:00 - 23:00",
             "phone": "+40 21 123 4567",
@@ -1119,7 +1120,13 @@ async def seed_data():
                     "price": 45.0,
                     "quantity": "300g",
                     "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
-                    "category": "Fel Principal"
+                    "category": "Fel Principal",
+                    "kcal": 420,
+                    "protein": 22.5,
+                    "carbs": 35.0,
+                    "fats": 18.0,
+                    "fiber": 4.2,
+                    "allergens": ["gluten"]
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -1128,7 +1135,13 @@ async def seed_data():
                     "price": 28.0,
                     "quantity": "400ml",
                     "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
-                    "category": "Supe"
+                    "category": "Supe",
+                    "kcal": 280,
+                    "protein": 18.0,
+                    "carbs": 12.0,
+                    "fats": 16.0,
+                    "fiber": 1.5,
+                    "allergens": ["lactate"]
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -1137,7 +1150,13 @@ async def seed_data():
                     "price": 32.0,
                     "quantity": "2 buc",
                     "image_url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
-                    "category": "Desert"
+                    "category": "Desert",
+                    "kcal": 580,
+                    "protein": 12.0,
+                    "carbs": 65.0,
+                    "fats": 28.0,
+                    "fiber": 2.0,
+                    "allergens": ["gluten", "lactate", "ouă"]
                 }
             ],
             "created_at": datetime.now(timezone.utc)
@@ -1159,6 +1178,7 @@ async def seed_data():
             "is_sponsored": False,
             "is_new": True,
             "cuisine_type": "Fusion",
+            "categories": ["exclusive", "fine_dining", "rooftop_view"],
             "price_range": "$$$",
             "opening_hours": "12:00 - 00:00",
             "phone": "+40 21 234 5678",
@@ -1170,7 +1190,13 @@ async def seed_data():
                     "price": 78.0,
                     "quantity": "280g",
                     "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
-                    "category": "Fel Principal"
+                    "category": "Fel Principal",
+                    "kcal": 520,
+                    "protein": 15.0,
+                    "carbs": 55.0,
+                    "fats": 24.0,
+                    "fiber": 3.0,
+                    "allergens": ["gluten", "lactate"]
                 },
                 {
                     "id": str(uuid.uuid4()),
@@ -1179,7 +1205,13 @@ async def seed_data():
                     "price": 65.0,
                     "quantity": "180g",
                     "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
-                    "category": "Aperitive"
+                    "category": "Aperitive",
+                    "kcal": 310,
+                    "protein": 28.0,
+                    "carbs": 4.0,
+                    "fats": 20.0,
+                    "fiber": 0.5,
+                    "allergens": ["ouă"]
                 }
             ],
             "created_at": datetime.now(timezone.utc)
@@ -1199,6 +1231,7 @@ async def seed_data():
             "is_sponsored": True,
             "is_new": False,
             "cuisine_type": "Mediteranean",
+            "categories": ["exclusive", "seafood_de_lux"],
             "price_range": "$$$",
             "opening_hours": "11:00 - 23:00",
             "phone": "+40 21 345 6789",
@@ -1210,7 +1243,13 @@ async def seed_data():
                     "price": 85.0,
                     "quantity": "350g",
                     "image_url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
-                    "category": "Fel Principal"
+                    "category": "Fel Principal",
+                    "kcal": 340,
+                    "protein": 38.0,
+                    "carbs": 8.0,
+                    "fats": 16.0,
+                    "fiber": 3.0,
+                    "allergens": ["pește"]
                 }
             ],
             "created_at": datetime.now(timezone.utc)
@@ -1230,6 +1269,7 @@ async def seed_data():
             "is_sponsored": False,
             "is_new": False,
             "cuisine_type": "Românesc",
+            "categories": [],
             "price_range": "$",
             "opening_hours": "09:00 - 22:00",
             "phone": "+40 21 456 7890",
@@ -1241,7 +1281,13 @@ async def seed_data():
                     "price": 35.0,
                     "quantity": "10 buc",
                     "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400",
-                    "category": "Fel Principal"
+                    "category": "Fel Principal",
+                    "kcal": 650,
+                    "protein": 35.0,
+                    "carbs": 25.0,
+                    "fats": 42.0,
+                    "fiber": 2.0,
+                    "allergens": ["gluten"]
                 }
             ],
             "created_at": datetime.now(timezone.utc)
@@ -1261,6 +1307,7 @@ async def seed_data():
             "is_sponsored": False,
             "is_new": True,
             "cuisine_type": "Japonez",
+            "categories": ["exclusive", "premium"],
             "price_range": "$$$",
             "opening_hours": "12:00 - 23:00",
             "phone": "+40 21 567 8901",
@@ -1272,7 +1319,121 @@ async def seed_data():
                     "price": 58.0,
                     "quantity": "8 buc",
                     "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400",
-                    "category": "Sushi"
+                    "category": "Sushi",
+                    "kcal": 380,
+                    "protein": 20.0,
+                    "carbs": 42.0,
+                    "fats": 14.0,
+                    "fiber": 3.5,
+                    "allergens": ["pește", "soia", "gluten"]
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Sky Lounge Rooftop",
+            "description": "Restaurant premium pe acoperiș cu vedere panoramică asupra Bucureștiului și bucătărie internațională de excepție.",
+            "address": "Str. Știrbei Vodă 4, Etaj 15, București",
+            "latitude": 44.4380,
+            "longitude": 26.0950,
+            "cover_image": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800",
+            "interior_images": [
+                "https://images.unsplash.com/photo-1544124499-58912cbddaad?w=800"
+            ],
+            "rating": 4.9,
+            "review_count": 278,
+            "likes": 1890,
+            "is_sponsored": True,
+            "is_new": True,
+            "cuisine_type": "Internațional",
+            "categories": ["exclusive", "rooftop_view", "fine_dining", "premium"],
+            "price_range": "$$$",
+            "opening_hours": "17:00 - 02:00",
+            "phone": "+40 21 678 9012",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Wagyu Steak A5",
+                    "description": "Wagyu japonez A5 cu piure trufat și sparanghel",
+                    "price": 280.0,
+                    "quantity": "200g",
+                    "image_url": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400",
+                    "category": "Fel Principal",
+                    "kcal": 750,
+                    "protein": 42.0,
+                    "carbs": 12.0,
+                    "fats": 58.0,
+                    "fiber": 2.0,
+                    "allergens": ["lactate"]
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Homar Thermidor",
+                    "description": "Homar proaspăt cu sos cremos și cașcaval gratinat",
+                    "price": 195.0,
+                    "quantity": "450g",
+                    "image_url": "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400",
+                    "category": "Specialități",
+                    "kcal": 520,
+                    "protein": 35.0,
+                    "carbs": 18.0,
+                    "fats": 32.0,
+                    "fiber": 1.0,
+                    "allergens": ["crustacee", "lactate", "gluten"]
+                }
+            ],
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "The Steakhouse Premium",
+            "description": "Cele mai bune steakuri dry-aged, premium cuts și vinuri selecte într-o ambianță elegantă.",
+            "address": "Bd. Primăverii 88, București",
+            "latitude": 44.4520,
+            "longitude": 26.0830,
+            "cover_image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=800",
+            "interior_images": [],
+            "rating": 4.8,
+            "review_count": 345,
+            "likes": 1650,
+            "is_sponsored": True,
+            "is_new": False,
+            "cuisine_type": "Steakhouse",
+            "categories": ["exclusive", "steakhouse_premium", "fine_dining"],
+            "price_range": "$$$",
+            "opening_hours": "12:00 - 00:00",
+            "phone": "+40 21 789 0123",
+            "menu": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Ribeye Dry-Aged 45 zile",
+                    "description": "Ribeye maturat 45 zile cu unt de trufe și cartofi fondant",
+                    "price": 185.0,
+                    "quantity": "350g",
+                    "image_url": "https://images.unsplash.com/photo-1558030006-450675393462?w=400",
+                    "category": "Steakuri",
+                    "kcal": 820,
+                    "protein": 55.0,
+                    "carbs": 5.0,
+                    "fats": 62.0,
+                    "fiber": 0.0,
+                    "allergens": ["lactate"]
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Tomahawk pentru 2",
+                    "description": "Tomahawk 1.2kg cu garnitură la alegere",
+                    "price": 320.0,
+                    "quantity": "1.2kg",
+                    "image_url": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400",
+                    "category": "Steakuri",
+                    "kcal": 1450,
+                    "protein": 95.0,
+                    "carbs": 8.0,
+                    "fats": 110.0,
+                    "fiber": 0.0,
+                    "allergens": []
                 }
             ],
             "created_at": datetime.now(timezone.utc)
