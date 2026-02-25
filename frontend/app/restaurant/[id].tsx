@@ -509,15 +509,28 @@ export default function RestaurantDetailScreen() {
         )}
       </View>
 
-      {/* Reserve Button */}
+      {/* Reserve Button + Cart */}
       <View style={[styles.reserveContainer, { paddingBottom: insets.bottom + SPACING.md }]}>
-        <TouchableOpacity
-          style={styles.reserveButton}
-          onPress={() => setShowReservationModal(true)}
-        >
-          <Ionicons name="calendar" size={22} color={COLORS.text} />
-          <Text style={styles.reserveButtonText}>Rezervă o masă</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomButtonsRow}>
+          <TouchableOpacity
+            style={styles.cartFloatingBtn}
+            onPress={() => router.push('/cart')}
+          >
+            <Ionicons name="cart" size={22} color={COLORS.text} />
+            {cartItemCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.reserveButton}
+            onPress={() => setShowReservationModal(true)}
+          >
+            <Ionicons name="calendar" size={22} color={COLORS.text} />
+            <Text style={styles.reserveButtonText}>Rezervă o masă</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Reservation Modal */}
