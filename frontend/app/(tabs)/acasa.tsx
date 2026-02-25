@@ -54,6 +54,7 @@ export default function AcasaScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('sponsored');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [exclusiveSubcategory, setExclusiveSubcategory] = useState('all_exclusive');
+  const [showExclusiveSheet, setShowExclusiveSheet] = useState(false);
 
   const loadRestaurants = async () => {
     try {
@@ -69,10 +70,26 @@ export default function AcasaScreen() {
           filtered = filtered.filter((r: any) => r.categories?.includes(exclusiveSubcategory));
         }
       } else if (selectedCategory !== 'all') {
-        filtered = data.filter((r: any) => 
-          r.categories?.includes(selectedCategory) || 
-          r.cuisine_type?.toLowerCase().includes(selectedCategory)
-        );
+        const cat = selectedCategory.toLowerCase();
+        filtered = data.filter((r: any) => {
+          // Match by cuisine_type
+          const cuisine = (r.cuisine_type || '').toLowerCase();
+          if (cuisine.includes(cat)) return true;
+          // Match by menu categories
+          if (r.menu?.some((m: any) => (m.category || '').toLowerCase().includes(cat))) return true;
+          // Match by name/description
+          const name = (r.name || '').toLowerCase();
+          const desc = (r.description || '').toLowerCase();
+          if (name.includes(cat) || desc.includes(cat)) return true;
+          // Special mappings
+          if (cat === 'pizza' && (cuisine.includes('italian') || r.menu?.some((m: any) => m.name?.toLowerCase().includes('pizza')))) return true;
+          if (cat === 'sushi' && (cuisine.includes('japonez') || cuisine.includes('japanese'))) return true;
+          if (cat === 'fast-food' && (cuisine.includes('fast') || cuisine.includes('burger'))) return true;
+          if (cat === 'deserturi' && r.menu?.some((m: any) => (m.category || '').toLowerCase().includes('desert'))) return true;
+          if (cat === 'aperitive' && r.menu?.some((m: any) => (m.category || '').toLowerCase().includes('aperiti'))) return true;
+          if (cat === 'bauturi' && r.menu?.some((m: any) => (m.category || '').toLowerCase().includes('bautur') || (m.category || '').toLowerCase().includes('drink'))) return true;
+          return false;
+        });
       }
       
       setRestaurants(filtered);
