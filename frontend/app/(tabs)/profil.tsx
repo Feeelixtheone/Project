@@ -319,7 +319,7 @@ export default function ProfilScreen() {
             <Ionicons name="cart" size={24} color="#FF6B35" />
           </View>
           <Text style={styles.quickAccessTitle}>Coșul meu</Text>
-          <Text style={styles.quickAccessSub}>{useCartStore.getState().getItemCount()} produse</Text>
+          <Text style={styles.quickAccessSub}>Produsele tale</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.quickAccessCard}
