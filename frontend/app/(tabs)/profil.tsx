@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { getPaymentMethods, addPaymentMethod, deletePaymentMethod, updateUser, apiRequest } from '../../src/utils/api';
+import { useCartStore } from '../../src/stores/cartStore';
 
 type TabType = 'profil' | 'plati' | 'setari';
 
