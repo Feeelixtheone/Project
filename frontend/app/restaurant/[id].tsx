@@ -214,16 +214,22 @@ export default function RestaurantDetailScreen() {
     const qtyInCart = cartItem ? cartItem.quantity : 0;
 
     return (
-      <View style={styles.menuItem}>
+      <TouchableOpacity style={styles.menuItem} onPress={() => setSelectedMenuItem(item)} activeOpacity={0.85}>
         <Image source={{ uri: item.image_url }} style={styles.menuItemImage} />
         <View style={styles.menuItemContent}>
           <Text style={styles.menuItemName}>{item.name}</Text>
           <Text style={styles.menuItemDescription} numberOfLines={2}>{item.description}</Text>
+          {item.kcal && (
+            <View style={styles.kcalRow}>
+              <Ionicons name="flame-outline" size={13} color={COLORS.primary} />
+              <Text style={styles.kcalText}>{item.kcal} kcal</Text>
+            </View>
+          )}
           <View style={styles.menuItemFooter}>
             <Text style={styles.menuItemQuantity}>{item.quantity}</Text>
             <Text style={styles.menuItemPrice}>{item.price.toFixed(2)} RON</Text>
           </View>
-          <TouchableOpacity style={styles.addToCartBtn} onPress={() => handleAddToCart(item)}>
+          <TouchableOpacity style={styles.addToCartBtn} onPress={(e) => { e.stopPropagation && e.stopPropagation(); handleAddToCart(item); }}>
             <Ionicons name="cart" size={16} color={COLORS.text} />
             <Text style={styles.addToCartText}>Adaugă în coș</Text>
             {qtyInCart > 0 && (
@@ -233,7 +239,7 @@ export default function RestaurantDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
