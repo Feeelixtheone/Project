@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { 
   getReservations, 
@@ -27,12 +27,15 @@ import {
 } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { DatePicker, TimePicker } from '../../src/components/DateTimePicker';
+import { useCartStore } from '../../src/stores/cartStore';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function RezervariScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const params = useLocalSearchParams();
+  const clearRestaurantItems = useCartStore((s) => s.clearRestaurantItems);
   const [reservations, setReservations] = useState<any[]>([]);
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +55,30 @@ export default function RezervariScreen() {
 
   // Restaurant selector
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
+
+  // Handle prefill from cart
+  useEffect(() => {
+    if (params.prefill_restaurant_id && params.prefill_type === 'food_ready') {
+      const prefillRestaurant = async () => {
+        try {
+          const rest = await getRestaurant(params.prefill_restaurant_id as string);
+          setSelectedRestaurant(rest);
+          setReservationType('food_ready');
+          if (params.prefill_items) {
+            const items = JSON.parse(params.prefill_items as string);
+            setSelectedMenuItems(items.map((item: any) => ({
+              ...item,
+              selected: true,
+            })));
+          }
+          setShowNewReservation(true);
+        } catch (error) {
+          console.error('Error prefilling reservation:', error);
+        }
+      };
+      prefillRestaurant();
+    }
+  }, [params.prefill_restaurant_id]);
 
   const loadReservations = async () => {
     try {
