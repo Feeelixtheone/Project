@@ -255,6 +255,38 @@ export default function AcasaScreen() {
         />
       </View>
 
+      {/* Exclusive Sub-filters */}
+      {selectedCategory === 'exclusive' && (
+        <View style={styles.exclusiveSubBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.lg }}>
+            {EXCLUSIVE_SUBCATEGORIES.map((sub) => (
+              <TouchableOpacity
+                key={sub.id}
+                style={[
+                  styles.exclusiveSubBtn,
+                  exclusiveSubcategory === sub.id && styles.exclusiveSubBtnActive,
+                ]}
+                onPress={() => setExclusiveSubcategory(sub.id)}
+              >
+                <Ionicons
+                  name={sub.icon as any}
+                  size={14}
+                  color={exclusiveSubcategory === sub.id ? COLORS.background : COLORS.gold}
+                />
+                <Text
+                  style={[
+                    styles.exclusiveSubText,
+                    exclusiveSubcategory === sub.id && styles.exclusiveSubTextActive,
+                  ]}
+                >
+                  {sub.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Sort Options */}
       <View style={styles.sortContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
