@@ -94,35 +94,36 @@ export default function ProfilScreen() {
   };
 
   const handleAddCard = () => {
-    Alert.prompt(
-      'Adăugă card',
-      'Introdu ultimele 4 cifre ale cardului',
-      [
-        { text: 'Anulează', style: 'cancel' },
-        {
-          text: 'Adăugă',
-          onPress: async (lastFour) => {
-            if (lastFour && lastFour.length === 4) {
-              try {
-                await addPaymentMethod({
-                  card_type: 'visa',
-                  last_four: lastFour,
-                  expiry_month: '12',
-                  expiry_year: '25',
-                  is_default: paymentMethods.length === 0,
-                });
-                loadPaymentMethods();
-              } catch (error) {
-                Alert.alert('Eroare', 'Nu s-a putut adăuga cardul');
-              }
-            } else {
-              Alert.alert('Eroare', 'Introdu 4 cifre valide');
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
+    setCardLastFour('');
+    setCardExpiryMonth('');
+    setCardExpiryYear('');
+    setCardType('visa');
+    setShowAddCardModal(true);
+  };
+
+  const handleSubmitCard = async () => {
+    if (!cardLastFour || cardLastFour.length !== 4 || !/^\d{4}$/.test(cardLastFour)) {
+      Alert.alert('Eroare', 'Introdu exact 4 cifre valide');
+      return;
+    }
+    if (!cardExpiryMonth || !cardExpiryYear) {
+      Alert.alert('Eroare', 'Completează luna și anul expirării');
+      return;
+    }
+    try {
+      await addPaymentMethod({
+        card_type: cardType,
+        last_four: cardLastFour,
+        expiry_month: cardExpiryMonth,
+        expiry_year: cardExpiryYear,
+        is_default: paymentMethods.length === 0,
+      });
+      setShowAddCardModal(false);
+      loadPaymentMethods();
+      Alert.alert('Succes', 'Cardul a fost adăugat!');
+    } catch (error) {
+      Alert.alert('Eroare', 'Nu s-a putut adăuga cardul');
+    }
   };
 
   const handleDeleteCard = (id: string) => {
