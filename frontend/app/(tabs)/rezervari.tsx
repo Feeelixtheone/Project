@@ -338,7 +338,7 @@ export default function RezervariScreen() {
         </View>
       )}
 
-      {(item.status === 'pending' || item.status === 'confirmed') && item.can_cancel && (
+      {(item.status === 'pending' || item.status === 'confirmed' || item.status === 'pending_payment') && (
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => handleCancel(item.id, item)}
