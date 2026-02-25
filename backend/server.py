@@ -218,6 +218,12 @@ class MenuItem(BaseModel):
     image_url: str
     image_3d_url: Optional[str] = None
     category: str  # e.g., "Aperitive", "Fel principal", "Desert"
+    kcal: Optional[int] = None
+    protein: Optional[float] = None
+    carbs: Optional[float] = None
+    fats: Optional[float] = None
+    fiber: Optional[float] = None
+    allergens: Optional[List[str]] = None
 
 class Restaurant(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
