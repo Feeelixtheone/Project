@@ -188,19 +188,53 @@ export default function RestaurantDetailScreen() {
 
   const menuCategories = [...new Set(restaurant.menu.map((item: any) => item.category))];
 
-  const renderMenuItem = ({ item }: { item: any }) => (
-    <View style={styles.menuItem}>
-      <Image source={{ uri: item.image_url }} style={styles.menuItemImage} />
-      <View style={styles.menuItemContent}>
-        <Text style={styles.menuItemName}>{item.name}</Text>
-        <Text style={styles.menuItemDescription} numberOfLines={2}>{item.description}</Text>
-        <View style={styles.menuItemFooter}>
-          <Text style={styles.menuItemQuantity}>{item.quantity}</Text>
-          <Text style={styles.menuItemPrice}>{item.price.toFixed(2)} RON</Text>
+  const { addItem, getItemCount, getRestaurantItems } = useCartStore();
+  const cartItemCount = getItemCount();
+
+  const handleAddToCart = (menuItem: any) => {
+    addItem({
+      menuItemId: menuItem.id,
+      restaurantId: id!,
+      restaurantName: restaurant.name,
+      name: menuItem.name,
+      description: menuItem.description || '',
+      price: menuItem.price,
+      imageUrl: menuItem.image_url || 'https://via.placeholder.com/80',
+    });
+    Alert.alert('Adăugat în coș!', `${menuItem.name} a fost adăugat în coș.`, [
+      { text: 'Continuă', style: 'cancel' },
+      { text: 'Vezi coșul', onPress: () => router.push('/cart') },
+    ]);
+  };
+
+  const renderMenuItem = ({ item }: { item: any }) => {
+    const cartItems = getRestaurantItems(id!);
+    const cartItem = cartItems.find((ci) => ci.menuItemId === item.id);
+    const qtyInCart = cartItem ? cartItem.quantity : 0;
+
+    return (
+      <View style={styles.menuItem}>
+        <Image source={{ uri: item.image_url }} style={styles.menuItemImage} />
+        <View style={styles.menuItemContent}>
+          <Text style={styles.menuItemName}>{item.name}</Text>
+          <Text style={styles.menuItemDescription} numberOfLines={2}>{item.description}</Text>
+          <View style={styles.menuItemFooter}>
+            <Text style={styles.menuItemQuantity}>{item.quantity}</Text>
+            <Text style={styles.menuItemPrice}>{item.price.toFixed(2)} RON</Text>
+          </View>
+          <TouchableOpacity style={styles.addToCartBtn} onPress={() => handleAddToCart(item)}>
+            <Ionicons name="cart" size={16} color={COLORS.text} />
+            <Text style={styles.addToCartText}>Adaugă în coș</Text>
+            {qtyInCart > 0 && (
+              <View style={styles.cartQtyBadge}>
+                <Text style={styles.cartQtyText}>{qtyInCart}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderReview = ({ item }: { item: any }) => (
     <View style={styles.reviewItem}>
