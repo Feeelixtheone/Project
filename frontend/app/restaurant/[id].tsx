@@ -189,7 +189,6 @@ export default function RestaurantDetailScreen() {
 
   const menuCategories = [...new Set(restaurant.menu.map((item: any) => item.category))];
 
-  const { addItem, getItemCount, getRestaurantItems } = useCartStore();
   const cartItemCount = getItemCount();
 
   const handleAddToCart = (menuItem: any) => {
