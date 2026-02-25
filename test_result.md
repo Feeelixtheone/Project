@@ -231,6 +231,30 @@ backend:
         agent: "testing"
         comment: "✅ TESTED SUCCESSFULLY: 1.7% platform fee calculation verified through Stripe payment integration. Working correctly in both checkout creation and reservation with payment flows. Examples: 100 RON → 1.70 RON fee, 20 RON → 0.34 RON fee."
 
+  - task: "Direct orders endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY: POST /api/orders/create endpoint exists and properly requires authentication. Returns 401 without Bearer token as expected. Endpoint accessible and configured correctly."
+
+  - task: "User orders retrieval endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY: GET /api/orders/my endpoint exists and properly requires authentication. Returns 401 without Bearer token as expected. Endpoint accessible and configured correctly."
+
 frontend:
   - task: "Welcome screen with company registration"
     implemented: true
