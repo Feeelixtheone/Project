@@ -35,6 +35,15 @@ const FOOD_CATEGORIES = [
   { id: 'fast-food', name: 'Fast Food', icon: 'fast-food-outline' },
 ];
 
+const EXCLUSIVE_SUBCATEGORIES = [
+  { id: 'all_exclusive', name: 'Toate Exclusive', icon: 'star' },
+  { id: 'fine_dining', name: 'Fine Dining', icon: 'wine' },
+  { id: 'steakhouse_premium', name: 'Steakhouse Premium', icon: 'flame' },
+  { id: 'seafood_de_lux', name: 'Seafood de Lux', icon: 'fish' },
+  { id: 'rooftop_view', name: 'Rooftop View', icon: 'eye' },
+  { id: 'premium', name: 'Premium', icon: 'diamond' },
+];
+
 export default function AcasaScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
