@@ -34,6 +34,13 @@ export default function ProfilScreen() {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editAddress, setEditAddress] = useState(user?.address || '');
 
+  // Add card modal
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [cardLastFour, setCardLastFour] = useState('');
+  const [cardExpiryMonth, setCardExpiryMonth] = useState('');
+  const [cardExpiryYear, setCardExpiryYear] = useState('');
+  const [cardType, setCardType] = useState('visa');
+
   useEffect(() => {
     if (activeTab === 'plati') {
       loadPaymentMethods();
