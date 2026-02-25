@@ -53,6 +53,7 @@ export default function AcasaScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('sponsored');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [exclusiveSubcategory, setExclusiveSubcategory] = useState('all_exclusive');
 
   const loadRestaurants = async () => {
     try {
@@ -62,7 +63,12 @@ export default function AcasaScreen() {
       
       // Filter by category if not "all"
       let filtered = data;
-      if (selectedCategory !== 'all') {
+      if (selectedCategory === 'exclusive') {
+        filtered = data.filter((r: any) => r.categories?.includes('exclusive'));
+        if (exclusiveSubcategory !== 'all_exclusive') {
+          filtered = filtered.filter((r: any) => r.categories?.includes(exclusiveSubcategory));
+        }
+      } else if (selectedCategory !== 'all') {
         filtered = data.filter((r: any) => 
           r.categories?.includes(selectedCategory) || 
           r.cuisine_type?.toLowerCase().includes(selectedCategory)
@@ -79,7 +85,7 @@ export default function AcasaScreen() {
 
   useEffect(() => {
     loadRestaurants();
-  }, [sortBy, searchQuery, selectedCategory]);
+  }, [sortBy, searchQuery, selectedCategory, exclusiveSubcategory]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
