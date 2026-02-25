@@ -551,24 +551,20 @@ export default function RestaurantDetailScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Data (ex: 2025-01-15)</Text>
-                <TextInput
-                  style={styles.formInput}
+                <DatePicker
+                  label="Data *"
                   value={reservationDate}
-                  onChangeText={setReservationDate}
-                  placeholder="AAAA-LL-ZZ"
-                  placeholderTextColor={COLORS.textMuted}
+                  onChange={setReservationDate}
+                  placeholder="Selectează data"
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ora</Text>
-                <TextInput
-                  style={styles.formInput}
+                <TimePicker
+                  label="Ora *"
                   value={reservationTime}
-                  onChangeText={setReservationTime}
-                  placeholder="19:00"
-                  placeholderTextColor={COLORS.textMuted}
+                  onChange={setReservationTime}
+                  placeholder="Selectează ora"
                 />
               </View>
 
