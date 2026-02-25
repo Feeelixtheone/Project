@@ -197,11 +197,6 @@ export default function AcasaScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.cartHeaderBtn} onPress={() => router.push('/cart')}>
             <Ionicons name="cart-outline" size={24} color={COLORS.text} />
-            {useCartStore.getState().getItemCount() > 0 && (
-              <View style={styles.cartHeaderBadge}>
-                <Text style={styles.cartHeaderBadgeText}>{useCartStore.getState().getItemCount()}</Text>
-              </View>
-            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
             {user?.picture ? (
