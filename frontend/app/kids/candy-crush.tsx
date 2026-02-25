@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Alert,
-  Animated,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../src/constants/theme';
+import { usePointsStore } from '../../src/stores/pointsStore';
 
 const GRID_SIZE = 7;
 const FOOD_ITEMS = [
@@ -53,29 +53,17 @@ function createGrid(): Cell[][] {
 
 function findMatches(grid: Cell[][]): Set<string> {
   const matched = new Set<string>();
-  // Horizontal
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE - 2; c++) {
-      if (
-        grid[r][c].type === grid[r][c + 1].type &&
-        grid[r][c].type === grid[r][c + 2].type
-      ) {
-        matched.add(`${r}-${c}`);
-        matched.add(`${r}-${c + 1}`);
-        matched.add(`${r}-${c + 2}`);
+      if (grid[r][c].type === grid[r][c + 1].type && grid[r][c].type === grid[r][c + 2].type) {
+        matched.add(`${r}-${c}`); matched.add(`${r}-${c + 1}`); matched.add(`${r}-${c + 2}`);
       }
     }
   }
-  // Vertical
   for (let c = 0; c < GRID_SIZE; c++) {
     for (let r = 0; r < GRID_SIZE - 2; r++) {
-      if (
-        grid[r][c].type === grid[r + 1][c].type &&
-        grid[r][c].type === grid[r + 2][c].type
-      ) {
-        matched.add(`${r}-${c}`);
-        matched.add(`${r + 1}-${c}`);
-        matched.add(`${r + 2}-${c}`);
+      if (grid[r][c].type === grid[r + 1][c].type && grid[r][c].type === grid[r + 2][c].type) {
+        matched.add(`${r}-${c}`); matched.add(`${r + 1}-${c}`); matched.add(`${r + 2}-${c}`);
       }
     }
   }
@@ -83,42 +71,37 @@ function findMatches(grid: Cell[][]): Set<string> {
 }
 
 function removeAndDrop(grid: Cell[][], matches: Set<string>): Cell[][] {
-  const newGrid = grid.map((row) => row.map((cell) => ({ ...cell })));
-  // Remove matched
-  matches.forEach((key) => {
-    const [r, c] = key.split('-').map(Number);
-    newGrid[r][c] = { type: -1, id: createId() };
-  });
-  // Drop
+  const g = grid.map((row) => row.map((cell) => ({ ...cell })));
+  matches.forEach((key) => { const [r, c] = key.split('-').map(Number); g[r][c] = { type: -1, id: createId() }; });
   for (let c = 0; c < GRID_SIZE; c++) {
     let emptyRow = GRID_SIZE - 1;
     for (let r = GRID_SIZE - 1; r >= 0; r--) {
-      if (newGrid[r][c].type !== -1) {
-        if (r !== emptyRow) {
-          newGrid[emptyRow][c] = newGrid[r][c];
-          newGrid[r][c] = { type: -1, id: createId() };
-        }
+      if (g[r][c].type !== -1) {
+        if (r !== emptyRow) { g[emptyRow][c] = g[r][c]; g[r][c] = { type: -1, id: createId() }; }
         emptyRow--;
       }
     }
-    // Fill empty spots
     for (let r = emptyRow; r >= 0; r--) {
-      newGrid[r][c] = { type: Math.floor(Math.random() * FOOD_ITEMS.length), id: createId() };
+      g[r][c] = { type: Math.floor(Math.random() * FOOD_ITEMS.length), id: createId() };
     }
   }
-  return newGrid;
+  return g;
 }
 
 export default function CandyCrushScreen() {
   const insets = useSafeAreaInsets();
+  const addPoints = usePointsStore((s) => s.addPoints);
+  const getHighScore = usePointsStore((s) => s.getHighScore);
   const [grid, setGrid] = useState<Cell[][]>(createGrid);
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(null);
   const [score, setScore] = useState(0);
   const [moves, setMoves] = useState(30);
   const [isProcessing, setIsProcessing] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [showEndScreen, setShowEndScreen] = useState(false);
+  const [pointsSaved, setPointsSaved] = useState(false);
 
-  // Process matches after grid changes
+  const highScore = getHighScore('candy-crush');
+
   const processMatches = useCallback(() => {
     const matches = findMatches(grid);
     if (matches.size > 0) {
@@ -132,16 +115,17 @@ export default function CandyCrushScreen() {
     }
   }, [grid]);
 
-  useEffect(() => {
-    processMatches();
-  }, [grid]);
+  useEffect(() => { processMatches(); }, [grid]);
 
   useEffect(() => {
-    if (moves <= 0 && !isProcessing) {
-      Alert.alert('Joc terminat!', `Scorul tău: ${score} puncte`, [
-        { text: 'Joacă din nou', onPress: resetGame },
-        { text: 'Înapoi', onPress: () => router.back() },
-      ]);
+    if (moves <= 0 && !isProcessing && !showEndScreen) {
+      setTimeout(() => {
+        if (!pointsSaved) {
+          addPoints('candy-crush', score);
+          setPointsSaved(true);
+        }
+        setShowEndScreen(true);
+      }, 500);
     }
   }, [moves, isProcessing]);
 
@@ -150,42 +134,21 @@ export default function CandyCrushScreen() {
     setScore(0);
     setMoves(30);
     setSelected(null);
+    setShowEndScreen(false);
+    setPointsSaved(false);
   };
 
   const handlePress = (row: number, col: number) => {
     if (isProcessing || moves <= 0) return;
-
-    if (!selected) {
-      setSelected({ row, col });
-      Animated.sequence([
-        Animated.timing(scaleAnim, { toValue: 1.2, duration: 100, useNativeDriver: true }),
-        Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-      ]).start();
-      return;
-    }
-
-    // Check adjacency
-    const isAdjacent =
-      (Math.abs(selected.row - row) === 1 && selected.col === col) ||
-      (Math.abs(selected.col - col) === 1 && selected.row === row);
-
-    if (!isAdjacent) {
-      setSelected({ row, col });
-      return;
-    }
-
-    // Swap
+    if (!selected) { setSelected({ row, col }); return; }
+    const isAdjacent = (Math.abs(selected.row - row) === 1 && selected.col === col) || (Math.abs(selected.col - col) === 1 && selected.row === row);
+    if (!isAdjacent) { setSelected({ row, col }); return; }
     const newGrid = grid.map((r) => r.map((c) => ({ ...c })));
     const temp = newGrid[row][col];
     newGrid[row][col] = newGrid[selected.row][selected.col];
     newGrid[selected.row][selected.col] = temp;
-
     const matches = findMatches(newGrid);
-    if (matches.size > 0) {
-      setGrid(newGrid);
-      setMoves((prev) => prev - 1);
-    }
-    // If no match, don't swap
+    if (matches.size > 0) { setGrid(newGrid); setMoves((prev) => prev - 1); }
     setSelected(null);
   };
 
@@ -193,7 +156,6 @@ export default function CandyCrushScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
@@ -204,7 +166,6 @@ export default function CandyCrushScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Score */}
       <View style={styles.scoreBar}>
         <View style={styles.scoreItem}>
           <Ionicons name="star" size={20} color={COLORS.gold} />
@@ -216,9 +177,13 @@ export default function CandyCrushScreen() {
           <Text style={styles.scoreValue}>{moves}</Text>
           <Text style={styles.scoreLabel}>Mutări</Text>
         </View>
+        <View style={styles.scoreItem}>
+          <Ionicons name="medal" size={20} color={COLORS.gold} />
+          <Text style={styles.scoreValue}>{highScore}</Text>
+          <Text style={styles.scoreLabel}>Record</Text>
+        </View>
       </View>
 
-      {/* Grid */}
       <View style={styles.gridContainer}>
         {grid.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.gridRow}>
@@ -228,12 +193,7 @@ export default function CandyCrushScreen() {
               return (
                 <TouchableOpacity
                   key={cell.id}
-                  style={[
-                    styles.cell,
-                    { width: CELL_SIZE, height: CELL_SIZE },
-                    isSel && styles.cellSelected,
-                    isMatch && styles.cellMatched,
-                  ]}
+                  style={[styles.cell, { width: CELL_SIZE, height: CELL_SIZE }, isSel && styles.cellSelected, isMatch && styles.cellMatched]}
                   onPress={() => handlePress(rowIndex, colIndex)}
                   activeOpacity={0.7}
                 >
@@ -244,52 +204,68 @@ export default function CandyCrushScreen() {
           </View>
         ))}
       </View>
+
+      {/* End Screen Modal */}
+      <Modal visible={showEndScreen} transparent animationType="fade">
+        <View style={styles.endOverlay}>
+          <View style={styles.endCard}>
+            <Text style={styles.endEmoji}>🎉</Text>
+            <Text style={styles.endTitle}>Joc terminat!</Text>
+            <View style={styles.endScoreCircle}>
+              <Text style={styles.endScoreValue}>{score}</Text>
+              <Text style={styles.endScoreLabel}>puncte</Text>
+            </View>
+            {score > highScore && score > 0 && (
+              <View style={styles.newRecordBadge}>
+                <Ionicons name="trophy" size={16} color={COLORS.background} />
+                <Text style={styles.newRecordText}>Nou Record!</Text>
+              </View>
+            )}
+            <Text style={styles.endPointsAdded}>+{score} puncte adăugate la total</Text>
+            <View style={styles.endButtons}>
+              <TouchableOpacity style={styles.endBtnPrimary} onPress={resetGame}>
+                <Ionicons name="refresh" size={20} color={COLORS.text} />
+                <Text style={styles.endBtnPrimaryText}>Încearcă din nou</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.endBtnSecondary} onPress={() => router.back()}>
+                <Text style={styles.endBtnSecondaryText}>Înapoi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background, alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    width: '100%',
-    gap: SPACING.md,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, width: '100%', gap: SPACING.md },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontFamily: FONTS.bold, fontSize: 22, color: COLORS.text, textAlign: 'center' },
-  scoreBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.xl,
-    paddingVertical: SPACING.md,
-  },
+  scoreBar: { flexDirection: 'row', justifyContent: 'center', gap: SPACING.xl, paddingVertical: SPACING.md },
   scoreItem: { alignItems: 'center' },
-  scoreValue: { fontFamily: FONTS.bold, fontSize: 28, color: COLORS.text, marginTop: 2 },
-  scoreLabel: { fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textSecondary },
-  gridContainer: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.sm,
-    ...{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-  },
+  scoreValue: { fontFamily: FONTS.bold, fontSize: 24, color: COLORS.text, marginTop: 2 },
+  scoreLabel: { fontFamily: FONTS.regular, fontSize: 11, color: COLORS.textSecondary },
+  gridContainer: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: SPACING.sm, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   gridRow: { flexDirection: 'row' },
-  cell: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.sm,
-    margin: 1,
-    backgroundColor: COLORS.surfaceLight,
-  },
-  cellSelected: {
-    backgroundColor: COLORS.primary + '40',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  cellMatched: {
-    backgroundColor: COLORS.gold + '30',
-  },
+  cell: { justifyContent: 'center', alignItems: 'center', borderRadius: BORDER_RADIUS.sm, margin: 1, backgroundColor: COLORS.surfaceLight },
+  cellSelected: { backgroundColor: COLORS.primary + '40', borderWidth: 2, borderColor: COLORS.primary },
+  cellMatched: { backgroundColor: COLORS.gold + '30' },
   emoji: { fontSize: CELL_SIZE * 0.55 },
+  endOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: SPACING.lg },
+  endCard: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: '100%', maxWidth: 340 },
+  endEmoji: { fontSize: 60, marginBottom: SPACING.sm },
+  endTitle: { fontFamily: FONTS.bold, fontSize: 28, color: COLORS.text, marginBottom: SPACING.md },
+  endScoreCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.primary + '20', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.primary, marginBottom: SPACING.md },
+  endScoreValue: { fontFamily: FONTS.bold, fontSize: 36, color: COLORS.primary },
+  endScoreLabel: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.textSecondary },
+  newRecordBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.gold, paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: BORDER_RADIUS.full, marginBottom: SPACING.sm },
+  newRecordText: { fontFamily: FONTS.bold, fontSize: 14, color: COLORS.background },
+  endPointsAdded: { fontFamily: FONTS.medium, fontSize: 14, color: COLORS.success, marginBottom: SPACING.lg },
+  endButtons: { width: '100%', gap: SPACING.sm },
+  endBtnPrimary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: BORDER_RADIUS.md },
+  endBtnPrimaryText: { fontFamily: FONTS.semiBold, fontSize: 16, color: COLORS.text },
+  endBtnSecondary: { alignItems: 'center', padding: SPACING.md, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.surfaceLight },
+  endBtnSecondaryText: { fontFamily: FONTS.medium, fontSize: 15, color: COLORS.textSecondary },
 });
