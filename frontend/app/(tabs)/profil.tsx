@@ -887,17 +887,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.error,
   },
-  quickAccessRow: {
+  quickAccessCardFull: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  quickAccessCard: {
-    flex: 1,
+    alignItems: 'center',
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
-    alignItems: 'center',
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
     ...SHADOWS.sm,
   },
   quickAccessIcon: {
