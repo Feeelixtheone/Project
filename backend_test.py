@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timedelta
 
 # Base URL from frontend .env
-BASE_URL = "https://dish-discover-13.preview.emergentagent.com/api"
+BASE_URL = "https://quick-order-178.preview.emergentagent.com/api"
 
 class RestaurantAPITester:
     def __init__(self):
@@ -370,7 +370,7 @@ class RestaurantAPITester:
                 "reservation_type": "table_only",
                 "restaurant_id": self.test_restaurant_id,
                 "amount": 100.0,
-                "origin_url": "https://dish-discover-13.preview.emergentagent.com",
+                "origin_url": "https://quick-order-178.preview.emergentagent.com",
                 "reservation_data": {
                     "date": "2025-02-20",
                     "time": "19:00",
@@ -475,7 +475,7 @@ class RestaurantAPITester:
                 "special_requests": "Table with view please",
                 "reservation_type": "table_only",
                 "ordered_items": [],
-                "origin_url": "https://dish-discover-13.preview.emergentagent.com"
+                "origin_url": "https://quick-order-178.preview.emergentagent.com"
             }
             
             response = requests.post(f"{BASE_URL}/reservations/with-payment", 
