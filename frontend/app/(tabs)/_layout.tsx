@@ -59,11 +59,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="nou"
         options={{
-          title: 'Nou',
+          title: 'Descoperă',
           tabBarIcon: ({ color, size }) => (
-            <View style={styles.newBadge}>
-              <Ionicons name="sparkles" size={size} color={color} />
-            </View>
+            <Ionicons name="sparkles" size={size} color={color} />
           ),
         }}
       />
