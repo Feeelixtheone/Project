@@ -46,6 +46,8 @@ export default function RestaurantDetailScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [isLiked, setIsLiked] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [specialOffers, setSpecialOffers] = useState<any[]>([]);
+  const [feedbackList, setFeedbackList] = useState<any[]>([]);
   
   // Modals
   const [showReservationModal, setShowReservationModal] = useState(false);
