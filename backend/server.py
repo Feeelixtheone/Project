@@ -2060,6 +2060,54 @@ async def add_store_product(store_id: str, data: StoreProductCreate, user: User 
     
     return product
 
+@api_router.delete("/stores/{store_id}/products/{product_id}")
+async def delete_store_product(store_id: str, product_id: str, user: User = Depends(require_auth)):
+    """Delete a product from store"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": store_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    await db.store_products.delete_one({"id": product_id, "store_id": store_id})
+    await db.restaurants.update_one(
+        {"id": store_id},
+        {"$pull": {"menu": {"id": product_id}}}
+    )
+    
+    return {"message": "Produsul a fost șters"}
+
+@api_router.get("/stores/{store_id}/products")
+async def get_store_products(store_id: str):
+    """Get all products for a store"""
+    products = await db.store_products.find({"store_id": store_id}, {"_id": 0}).to_list(200)
+    return products
+
+@api_router.get("/stores/{store_id}/orders")
+async def get_store_orders(store_id: str, user: User = Depends(require_auth)):
+    """Get orders for a specific store"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": store_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Magazinul nu a fost găsit")
+    
+    orders = await db.orders.find(
+        {"restaurant_id": store_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    
+    reservations = await db.reservations.find(
+        {"restaurant_id": store_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    
+    return {"orders": orders, "reservations": reservations}
+
 @api_router.post("/stores/{store_id}/images-3d")
 async def upload_3d_image(store_id: str, image_url: str, user: User = Depends(require_auth)):
     """Upload 3D image for store"""
