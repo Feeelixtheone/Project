@@ -2577,6 +2577,15 @@ async def create_reservation_with_payment(
     )
     await db.reservations.insert_one(reservation.dict())
     
+    # Send notification to restaurant
+    await create_restaurant_notification(
+        restaurant_id=data.restaurant_id,
+        notification_type="new_reservation",
+        title="Rezervare nouă cu plată",
+        message=f"Ai primit o rezervare nouă de la {user.name} pentru {data.date} la {data.time}. {data.guests} persoane. Tip: {'Cu mâncare gata' if data.reservation_type == 'food_ready' else 'Doar masă'}.",
+        data={"reservation_id": reservation.id}
+    )
+    
     # Create Stripe checkout session
     host_url = str(request.base_url).rstrip('/')
     webhook_url = f"{host_url}/api/webhook/stripe"
