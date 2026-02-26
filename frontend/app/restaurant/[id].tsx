@@ -341,7 +341,12 @@ export default function RestaurantDetailScreen() {
       return (
         <ScrollView contentContainerStyle={styles.galleryGrid}>
           {images.map((image: string, index: number) => (
-            <Image key={index} source={{ uri: image }} style={styles.galleryImage} />
+            <TouchableOpacity key={index} onPress={() => openFullscreenImage(image)} activeOpacity={0.8}>
+              <Image source={{ uri: image }} style={styles.galleryImage} />
+              <View style={styles.expandOverlay}>
+                <Ionicons name="expand" size={24} color="#fff" />
+              </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       );
@@ -362,13 +367,18 @@ export default function RestaurantDetailScreen() {
       return (
         <ScrollView contentContainerStyle={styles.galleryGrid}>
           {images3d.map((image: string, index: number) => (
-            <View key={index} style={styles.image3dContainer}>
-              <Image source={{ uri: image }} style={styles.galleryImage} />
-              <View style={styles.badge3dOverlay}>
-                <Ionicons name="cube" size={16} color={COLORS.text} />
-                <Text style={styles.badge3dText}>3D</Text>
+            <TouchableOpacity key={index} onPress={() => openFullscreenImage(image)} activeOpacity={0.8}>
+              <View style={styles.image3dContainer}>
+                <Image source={{ uri: image }} style={styles.galleryImage} />
+                <View style={styles.badge3dOverlay}>
+                  <Ionicons name="cube" size={16} color={COLORS.text} />
+                  <Text style={styles.badge3dText}>3D</Text>
+                </View>
+                <View style={styles.expandOverlay}>
+                  <Ionicons name="expand" size={24} color="#fff" />
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       );
