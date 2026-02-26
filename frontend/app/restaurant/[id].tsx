@@ -508,6 +508,25 @@ export default function RestaurantDetailScreen() {
           </View>
         </View>
 
+        {/* Special Offers Banner */}
+        {specialOffers.length > 0 && (
+          <View style={styles.offersSection} data-testid="special-offers-section">
+            {specialOffers.map((offer: any) => (
+              <View key={offer.id} style={styles.offerBanner}>
+                <View style={styles.offerBadge}>
+                  <Ionicons name="pricetag" size={14} color="#fff" />
+                  <Text style={styles.offerBadgeText}>OFERTĂ</Text>
+                </View>
+                <Text style={styles.offerTitle}>{offer.title}</Text>
+                <Text style={styles.offerDesc}>{offer.description}</Text>
+                {offer.discount_percentage && (
+                  <Text style={styles.offerDiscount}>-{offer.discount_percentage}%</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Tabs */}
         <View style={styles.tabsContainer}>
           {tabs.map((tab) => (
