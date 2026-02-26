@@ -358,9 +358,152 @@ export default function CompanyDashboard() {
             <Text style={styles.statValue}>2.7%</Text>
             <Text style={styles.statLabel}>Comision</Text>
           </View>
+          <TouchableOpacity style={styles.statCard} onPress={() => setActiveSection('notifications')}>
+            <Text style={styles.statValue}>{notifications.filter(n => !n.is_read).length}</Text>
+            <Text style={styles.statLabel}>Notificări noi</Text>
+          </TouchableOpacity>
         </View>
 
+        {/* Section Tabs */}
+        <View style={styles.sectionTabs}>
+          {(['stores', 'notifications', 'orders', 'receipts'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.sectionTab, activeSection === tab && styles.sectionTabActive]}
+              onPress={() => setActiveSection(tab)}
+              data-testid={`company-tab-${tab}`}
+            >
+              <Ionicons
+                name={tab === 'stores' ? 'restaurant' : tab === 'notifications' ? 'notifications' : tab === 'orders' ? 'receipt' : 'document-text'}
+                size={18}
+                color={activeSection === tab ? COLORS.primary : COLORS.textMuted}
+              />
+              <Text style={[styles.sectionTabText, activeSection === tab && styles.sectionTabTextActive]}>
+                {tab === 'stores' ? 'Restaurante' : tab === 'notifications' ? 'Notificări' : tab === 'orders' ? 'Comenzi' : 'Facturi'}
+              </Text>
+              {tab === 'notifications' && notifications.filter(n => !n.is_read).length > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{notifications.filter(n => !n.is_read).length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Notifications Section */}
+        {activeSection === 'notifications' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Notificări</Text>
+              {notifications.some(n => !n.is_read) && (
+                <TouchableOpacity onPress={handleMarkAllRead} data-testid="mark-all-read-btn">
+                  <Text style={{ color: COLORS.primary, fontFamily: FONTS.medium, fontSize: 14 }}>Marchează citite</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {notifications.length === 0 ? (
+              <View style={styles.emptyStores}>
+                <Ionicons name="notifications-off-outline" size={48} color={COLORS.textMuted} />
+                <Text style={styles.emptyText}>Nu ai notificări</Text>
+              </View>
+            ) : (
+              notifications.map((notif: any) => (
+                <View key={notif.id} style={[styles.notifItem, !notif.is_read && styles.notifUnread]} data-testid={`notif-${notif.id}`}>
+                  <Ionicons
+                    name={notif.notification_type === 'new_order' ? 'cart' : notif.notification_type === 'reservation_paid' ? 'calendar' : 'notifications'}
+                    size={24}
+                    color={!notif.is_read ? COLORS.primary : COLORS.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifTitle}>{notif.title}</Text>
+                    <Text style={styles.notifMessage}>{notif.message}</Text>
+                    <Text style={styles.notifTime}>{new Date(notif.created_at).toLocaleString('ro-RO')}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* Orders Section */}
+        {activeSection === 'orders' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Comenzi & Rezervări</Text>
+            {storeOrders.orders?.length === 0 && storeOrders.reservations?.length === 0 ? (
+              <View style={styles.emptyStores}>
+                <Ionicons name="receipt-outline" size={48} color={COLORS.textMuted} />
+                <Text style={styles.emptyText}>Nu ai comenzi sau rezervări</Text>
+              </View>
+            ) : (
+              <>
+                {storeOrders.orders?.map((order: any) => (
+                  <View key={order.id} style={styles.orderItem} data-testid={`order-${order.id}`}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderTitle}>Comandă #{order.id?.slice(-6)}</Text>
+                      <View style={[styles.orderStatus, { backgroundColor: order.status === 'confirmed' ? COLORS.success + '20' : COLORS.warning + '20' }]}>
+                        <Text style={[styles.orderStatusText, { color: order.status === 'confirmed' ? COLORS.success : COLORS.warning }]}>
+                          {order.status === 'confirmed' ? 'Confirmată' : order.status === 'pending_payment' ? 'Așteaptă plata' : order.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.orderDetail}>Client: {order.user_name || order.user_email}</Text>
+                    <Text style={styles.orderDetail}>Total: {order.total} RON</Text>
+                    <Text style={styles.orderDetail}>Comision: -{order.platform_fee} RON</Text>
+                    <Text style={[styles.orderDetail, { color: COLORS.success, fontFamily: FONTS.semiBold }]}>Vei primi: {order.restaurant_payout || (order.total - order.platform_fee).toFixed(2)} RON</Text>
+                    <Text style={styles.orderTime}>{new Date(order.created_at).toLocaleString('ro-RO')}</Text>
+                  </View>
+                ))}
+                {storeOrders.reservations?.map((res: any) => (
+                  <View key={res.id} style={styles.orderItem} data-testid={`reservation-${res.id}`}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderTitle}>Rezervare #{res.id?.slice(-6)}</Text>
+                      <View style={[styles.orderStatus, { backgroundColor: res.status === 'confirmed' ? COLORS.success + '20' : COLORS.warning + '20' }]}>
+                        <Text style={[styles.orderStatusText, { color: res.status === 'confirmed' ? COLORS.success : COLORS.warning }]}>
+                          {res.status === 'confirmed' ? 'Confirmată' : res.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.orderDetail}>Data: {res.date} la {res.time}</Text>
+                    <Text style={styles.orderDetail}>Persoane: {res.guests}</Text>
+                    {res.total_paid > 0 && <Text style={styles.orderDetail}>Plătit: {res.total_paid} RON</Text>}
+                    <Text style={styles.orderTime}>{new Date(res.created_at).toLocaleString('ro-RO')}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Receipts Section */}
+        {activeSection === 'receipts' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Facturi</Text>
+            {receipts.length === 0 ? (
+              <View style={styles.emptyStores}>
+                <Ionicons name="document-text-outline" size={48} color={COLORS.textMuted} />
+                <Text style={styles.emptyText}>Nu ai facturi încă</Text>
+              </View>
+            ) : (
+              receipts.map((receipt: any) => (
+                <View key={receipt.id} style={styles.orderItem} data-testid={`receipt-${receipt.id}`}>
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderTitle}>Factură {receipt.receipt_number}</Text>
+                    <Text style={{ fontFamily: FONTS.semiBold, color: COLORS.success }}>{receipt.status}</Text>
+                  </View>
+                  <Text style={styles.orderDetail}>CUI: {receipt.company_cui}</Text>
+                  <Text style={styles.orderDetail}>Restaurant: {receipt.restaurant_name}</Text>
+                  <Text style={styles.orderDetail}>Total: {receipt.total_amount} RON</Text>
+                  <Text style={styles.orderDetail}>Comision ({receipt.platform_commission_percentage}%): -{receipt.platform_commission} RON</Text>
+                  <Text style={[styles.orderDetail, { color: COLORS.success, fontFamily: FONTS.semiBold }]}>Payout: {receipt.restaurant_payout} RON</Text>
+                  <Text style={styles.orderTime}>{new Date(receipt.issued_date).toLocaleString('ro-RO')}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
         {/* Stores Section */}
+        {activeSection === 'stores' && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Restaurantele Tale</Text>
