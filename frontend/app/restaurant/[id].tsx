@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { getRestaurant, getReviews, createReview, createReservationWithPayment, toggleLike, checkLiked } from '../../src/utils/api';
+import { getRestaurant, getReviews, createReview, createReservationWithPayment, toggleLike, checkLiked, toggleFavorite, checkFavorite, getRestaurantOffers, getRestaurantFeedback } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCartStore } from '../../src/stores/cartStore';
 import { DatePicker, TimePicker } from '../../src/components/DateTimePicker';
