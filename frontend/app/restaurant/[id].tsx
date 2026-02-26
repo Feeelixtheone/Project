@@ -144,24 +144,61 @@ export default function RestaurantDetailScreen() {
       return;
     }
     
+    if (!user) {
+      Alert.alert('Eroare', 'Trebuie să fii autentificat pentru a face o rezervare.');
+      return;
+    }
+
+    setIsCreatingReservation(true);
+    
     try {
-      await createReservation({
+      const originUrl = BACKEND_URL || (typeof window !== 'undefined' ? window.location?.origin : '') || 'https://app.local';
+      
+      const reservationData = {
         restaurant_id: id,
         date: reservationDate,
         time: reservationTime,
         guests: parseInt(reservationGuests),
         special_requests: reservationNotes || undefined,
-      });
+        reservation_type: 'table_only',
+        ordered_items: [],
+        origin_url: originUrl,
+      };
+
+      const result = await createReservationWithPayment(reservationData);
+      
+      // Open Stripe checkout
+      if (result.payment?.checkout_url) {
+        const supported = await Linking.canOpenURL(result.payment.checkout_url);
+        if (supported) {
+          await Linking.openURL(result.payment.checkout_url);
+        } else {
+          // For web, try to open in new tab
+          if (typeof window !== 'undefined') {
+            window.open(result.payment.checkout_url, '_blank');
+          } else {
+            Alert.alert('Eroare', 'Nu se poate deschide pagina de plată.');
+          }
+        }
+      }
+
       setShowReservationModal(false);
-      Alert.alert('Succes', 'Rezervarea a fost creată!');
+      Alert.alert('Succes', 'Rezervarea a fost creată! Vei fi redirecționat pentru plată.');
       // Reset form
       setReservationDate('');
       setReservationTime('');
       setReservationGuests('2');
       setReservationNotes('');
-    } catch (error) {
-      Alert.alert('Eroare', 'Nu s-a putut crea rezervarea');
+    } catch (error: any) {
+      Alert.alert('Eroare', error.message || 'Nu s-a putut crea rezervarea');
+    } finally {
+      setIsCreatingReservation(false);
     }
+  };
+
+  const openFullscreenImage = (imageUrl: string) => {
+    setFullscreenImageUrl(imageUrl);
+    setShowFullscreenImage(true);
   };
 
   const handleReview = async () => {
