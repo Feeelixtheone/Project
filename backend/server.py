@@ -2231,9 +2231,9 @@ async def create_checkout_session(
         if not restaurant:
             raise HTTPException(status_code=404, detail="Restaurant negăsit")
         
-        # Calculate platform fee (1.7%)
+        # Calculate platform fee (2.7%) - deducted from restaurant, NOT charged to user
         platform_fee = round(data.amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-        total_amount = round(data.amount + platform_fee, 2)
+        total_amount = data.amount  # User pays only the base amount
         
         # Initialize Stripe
         host_url = str(request.base_url).rstrip('/')
