@@ -61,7 +61,15 @@ export default function CompanyDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [storeOrders, setStoreOrders] = useState<any>({ orders: [], reservations: [] });
   const [receipts, setReceipts] = useState<any[]>([]);
-  const [activeSection, setActiveSection] = useState<'stores' | 'notifications' | 'orders' | 'receipts'>('stores');
+  const [activeSection, setActiveSection] = useState<'stores' | 'notifications' | 'orders' | 'receipts' | 'offers'>('stores');
+
+  // Special Offers
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerStoreId, setOfferStoreId] = useState('');
+  const [offerTitle, setOfferTitle] = useState('');
+  const [offerDescription, setOfferDescription] = useState('');
+  const [offerDiscount, setOfferDiscount] = useState('');
+  const [isCreatingOffer, setIsCreatingOffer] = useState(false);
   // Store form
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
