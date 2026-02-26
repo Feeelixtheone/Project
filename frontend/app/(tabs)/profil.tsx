@@ -290,41 +290,135 @@ export default function ProfilScreen() {
 
   const renderPaymentTab = () => (
     <View style={styles.tabContent}>
+      {/* Favorites Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Plăți securizate</Text>
+          <Text style={styles.sectionTitle}>Restaurante favorite</Text>
+          <Ionicons name="heart" size={20} color={COLORS.error} />
         </View>
+        {favorites.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Ionicons name="heart-outline" size={40} color={COLORS.textMuted} />
+            <Text style={styles.emptySectionText}>Nu ai restaurante favorite</Text>
+            <Text style={styles.emptySectionSubtext}>Apasă pe inimă la un restaurant pentru a-l adăuga la favorite</Text>
+          </View>
+        ) : (
+          favorites.map((fav: any) => (
+            <TouchableOpacity
+              key={fav.id}
+              style={styles.favoriteItem}
+              onPress={() => router.push(`/restaurant/${fav.restaurant_id}`)}
+              data-testid={`favorite-${fav.restaurant_id}`}
+            >
+              <Image
+                source={{ uri: fav.restaurant?.cover_image || fav.restaurant?.images?.[0] }}
+                style={styles.favoriteImage}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.favoriteName}>{fav.restaurant?.name}</Text>
+                <Text style={styles.favoriteAddress}>{fav.restaurant?.cuisine_type} - {fav.restaurant?.address}</Text>
+                {fav.restaurant?.rating && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Ionicons name="star" size={14} color="#f59e0b" />
+                    <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.text }}>{fav.restaurant.rating}</Text>
+                  </View>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
 
-        <View style={styles.stripeInfoCard}>
-          <View style={styles.stripeIconContainer}>
-            <Ionicons name="shield-checkmark" size={48} color={COLORS.success} />
-          </View>
-          <Text style={styles.stripeTitle}>Plăți procesate prin Stripe</Text>
-          <Text style={styles.stripeDescription}>
-            Plățile tale sunt procesate securizat prin Stripe. Nu stocăm informații despre carduri pe serverele noastre.
-          </Text>
-          <View style={styles.stripeFeatures}>
-            <View style={styles.stripeFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-              <Text style={styles.stripeFeatureText}>Criptare SSL</Text>
-            </View>
-            <View style={styles.stripeFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-              <Text style={styles.stripeFeatureText}>PCI DSS compliant</Text>
-            </View>
-            <View style={styles.stripeFeature}>
-              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-              <Text style={styles.stripeFeatureText}>3D Secure</Text>
+      {/* Pending Feedback Section */}
+      {(pendingFeedback.orders?.length > 0 || pendingFeedback.reservations?.length > 0) && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Lasă feedback</Text>
+            <View style={styles.feedbackBadge}>
+              <Text style={styles.feedbackBadgeText}>{(pendingFeedback.orders?.length || 0) + (pendingFeedback.reservations?.length || 0)}</Text>
             </View>
           </View>
+          {pendingFeedback.orders?.map((order: any) => (
+            <TouchableOpacity
+              key={order.id}
+              style={styles.feedbackPendingItem}
+              onPress={() => openFeedbackFor(order, 'order')}
+              data-testid={`feedback-order-${order.id}`}
+            >
+              <Ionicons name="star-outline" size={24} color={COLORS.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.feedbackItemTitle}>Comandă la {order.restaurant_name}</Text>
+                <Text style={styles.feedbackItemSub}>{order.total} RON - {new Date(order.created_at).toLocaleDateString('ro-RO')}</Text>
+              </View>
+              <Text style={styles.feedbackCTA}>Evaluează</Text>
+            </TouchableOpacity>
+          ))}
+          {pendingFeedback.reservations?.map((res: any) => (
+            <TouchableOpacity
+              key={res.id}
+              style={styles.feedbackPendingItem}
+              onPress={() => openFeedbackFor(res, 'reservation')}
+              data-testid={`feedback-reservation-${res.id}`}
+            >
+              <Ionicons name="star-outline" size={24} color={COLORS.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.feedbackItemTitle}>Rezervare la {res.restaurant_name}</Text>
+                <Text style={styles.feedbackItemSub}>{res.date} - {res.guests} persoane</Text>
+              </View>
+              <Text style={styles.feedbackCTA}>Evaluează</Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      )}
 
+      {/* User Notifications */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Notificări</Text>
+          {userNotifications.some(n => !n.is_read) && (
+            <TouchableOpacity onPress={handleMarkAllUserNotifsRead} data-testid="mark-user-notifs-read">
+              <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: COLORS.primary }}>Marchează citite</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {userNotifications.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Ionicons name="notifications-off-outline" size={40} color={COLORS.textMuted} />
+            <Text style={styles.emptySectionText}>Nu ai notificări</Text>
+            <Text style={styles.emptySectionSubtext}>Adaugă restaurante la favorite pentru a primi oferte speciale</Text>
+          </View>
+        ) : (
+          userNotifications.slice(0, 10).map((notif: any) => (
+            <TouchableOpacity
+              key={notif.id}
+              style={[styles.notifItem, !notif.is_read && styles.notifUnread]}
+              onPress={() => notif.restaurant_id ? router.push(`/restaurant/${notif.restaurant_id}`) : null}
+              data-testid={`user-notif-${notif.id}`}
+            >
+              <Ionicons
+                name={notif.type === 'special_offer' ? 'pricetag' : 'notifications'}
+                size={22}
+                color={!notif.is_read ? COLORS.primary : COLORS.textMuted}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.notifTitle}>{notif.title}</Text>
+                <Text style={styles.notifMessage}>{notif.message}</Text>
+                <Text style={styles.notifTime}>{new Date(notif.created_at).toLocaleString('ro-RO')}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
+      {/* Stripe Info */}
+      <View style={styles.section}>
         <View style={styles.paymentInfoCard}>
-          <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+          <Ionicons name="shield-checkmark" size={24} color={COLORS.success} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.paymentInfoTitle}>Cum funcționează?</Text>
+            <Text style={styles.paymentInfoTitle}>Plăți securizate prin Stripe</Text>
             <Text style={styles.paymentInfoText}>
-              La momentul rezervării sau comenzii, vei fi redirecționat către pagina securizată Stripe pentru a finaliza plata.
+              Plățile tale sunt procesate securizat. Nu stocăm informații despre carduri.
             </Text>
           </View>
         </View>
