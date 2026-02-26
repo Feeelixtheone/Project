@@ -2470,6 +2470,7 @@ async def create_reservation_with_payment(
         upfront_fee=upfront_fee,
         platform_fee=platform_fee,
         total_paid=total_to_pay,
+        restaurant_payout=restaurant_payout,
         is_paid=False,
         can_cancel=can_cancel,
         cancellation_deadline=cancellation_deadline,
