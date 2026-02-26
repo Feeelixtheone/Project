@@ -706,6 +706,124 @@ export default function ProfilScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Lasă feedback</Text>
+              <TouchableOpacity onPress={() => setShowFeedbackModal(false)} data-testid="close-feedback-modal">
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {feedbackTarget && (
+              <ScrollView style={{ maxHeight: 400 }}>
+                <Text style={{ fontFamily: FONTS.medium, fontSize: 14, color: COLORS.textSecondary, marginBottom: SPACING.md }}>
+                  {feedbackTarget.restaurant_name || feedbackTarget.restaurant_id}
+                </Text>
+
+                {/* Overall Rating */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Rating general</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setFeedbackRating(star)} data-testid={`star-overall-${star}`}>
+                        <Ionicons
+                          name={star <= feedbackRating ? 'star' : 'star-outline'}
+                          size={32}
+                          color={star <= feedbackRating ? '#f59e0b' : COLORS.textMuted}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Food Rating */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Mâncare</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setFeedbackFoodRating(star)}>
+                        <Ionicons
+                          name={star <= feedbackFoodRating ? 'star' : 'star-outline'}
+                          size={28}
+                          color={star <= feedbackFoodRating ? '#f59e0b' : COLORS.textMuted}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Service Rating */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Serviciu</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setFeedbackServiceRating(star)}>
+                        <Ionicons
+                          name={star <= feedbackServiceRating ? 'star' : 'star-outline'}
+                          size={28}
+                          color={star <= feedbackServiceRating ? '#f59e0b' : COLORS.textMuted}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Comment */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Comentariu</Text>
+                  <TextInput
+                    style={[styles.formInput, { minHeight: 80, textAlignVertical: 'top' }]}
+                    value={feedbackComment}
+                    onChangeText={setFeedbackComment}
+                    placeholder="Ce ți-a plăcut? Ce s-ar putea îmbunătăți?"
+                    placeholderTextColor={COLORS.textMuted}
+                    multiline
+                    data-testid="feedback-comment"
+                  />
+                </View>
+
+                {/* Would recommend */}
+                <TouchableOpacity
+                  style={[styles.recommendToggle, feedbackRecommend && styles.recommendToggleActive]}
+                  onPress={() => setFeedbackRecommend(!feedbackRecommend)}
+                  data-testid="feedback-recommend"
+                >
+                  <Ionicons
+                    name={feedbackRecommend ? 'thumbs-up' : 'thumbs-up-outline'}
+                    size={20}
+                    color={feedbackRecommend ? COLORS.primary : COLORS.textMuted}
+                  />
+                  <Text style={[styles.recommendText, feedbackRecommend && { color: COLORS.primary }]}>
+                    {feedbackRecommend ? 'Recomand!' : 'Nu recomand'}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+
+            <TouchableOpacity
+              style={[styles.registerBtn, isSubmittingFeedback && { opacity: 0.6 }]}
+              onPress={handleSubmitFeedback}
+              disabled={isSubmittingFeedback}
+              data-testid="submit-feedback-btn"
+            >
+              {isSubmittingFeedback ? (
+                <ActivityIndicator color={COLORS.text} />
+              ) : (
+                <Text style={styles.registerBtnText}>Trimite feedback</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
