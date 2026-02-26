@@ -2609,7 +2609,7 @@ async def get_support_info():
     return {
         "client_support_email": SUPPORT_EMAIL_CLIENTS,
         "company_support_email": SUPPORT_EMAIL_COMPANIES,
-        "transaction_fee_percentage": TRANSACTION_FEE_PERCENTAGE,
+        "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
         "message": "Pentru asistență, contactați-ne la adresele de mai sus."
     }
 
