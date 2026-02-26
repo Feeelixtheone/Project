@@ -2601,6 +2601,127 @@ async def confirm_reservation_payment(
             "reservation_id": reservation_id
         }
 
+# ==================== NOTIFICATIONS ====================
+
+@api_router.get("/company/notifications")
+async def get_company_notifications(user: User = Depends(require_auth)):
+    """Get notifications for company's restaurants"""
+    # First get company for user
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ești asociat cu nicio firmă")
+    
+    # Get all restaurants for this company
+    restaurant_ids = [store["id"] for store in await db.restaurants.find(
+        {"company_id": company["id"]},
+        {"id": 1, "_id": 0}
+    ).to_list(100)]
+    
+    if not restaurant_ids:
+        return []
+    
+    notifications = await db.restaurant_notifications.find(
+        {"restaurant_id": {"$in": restaurant_ids}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    return notifications
+
+@api_router.put("/company/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    user: User = Depends(require_auth)
+):
+    """Mark a notification as read"""
+    await db.restaurant_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"is_read": True}}
+    )
+    return {"success": True}
+
+@api_router.put("/company/notifications/mark-all-read")
+async def mark_all_notifications_read(user: User = Depends(require_auth)):
+    """Mark all notifications as read for company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ești asociat cu nicio firmă")
+    
+    restaurant_ids = [store["id"] for store in await db.restaurants.find(
+        {"company_id": company["id"]},
+        {"id": 1, "_id": 0}
+    ).to_list(100)]
+    
+    await db.restaurant_notifications.update_many(
+        {"restaurant_id": {"$in": restaurant_ids}},
+        {"$set": {"is_read": True}}
+    )
+    return {"success": True}
+
+# ==================== RECEIPTS ====================
+
+@api_router.get("/company/receipts")
+async def get_company_receipts(user: User = Depends(require_auth)):
+    """Get all receipts for company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ești asociat cu nicio firmă")
+    
+    receipts = await db.receipts.find(
+        {"company_cui": company["cui"]},
+        {"_id": 0}
+    ).sort("issued_date", -1).to_list(100)
+    
+    return receipts
+
+@api_router.get("/company/receipts/{receipt_id}")
+async def get_receipt_details(
+    receipt_id: str,
+    user: User = Depends(require_auth)
+):
+    """Get detailed receipt"""
+    receipt = await db.receipts.find_one({"id": receipt_id}, {"_id": 0})
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Chitanță negăsită")
+    return receipt
+
+@api_router.get("/company/payout-summary")
+async def get_payout_summary(user: User = Depends(require_auth)):
+    """Get payout summary for company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ești asociat cu nicio firmă")
+    
+    # Get all confirmed reservations for company's restaurants
+    restaurant_ids = [store["id"] for store in await db.restaurants.find(
+        {"company_id": company["id"]},
+        {"id": 1, "_id": 0}
+    ).to_list(100)]
+    
+    reservations = await db.reservations.find(
+        {
+            "restaurant_id": {"$in": restaurant_ids},
+            "status": "confirmed",
+            "is_paid": True
+        },
+        {"_id": 0}
+    ).to_list(1000)
+    
+    total_revenue = sum(r.get("total_paid", 0) for r in reservations)
+    total_commission = sum(r.get("platform_commission", 0) for r in reservations)
+    total_payout = sum(r.get("restaurant_payout", 0) for r in reservations)
+    
+    return {
+        "company_name": company["name"],
+        "company_cui": company["cui"],
+        "total_reservations": len(reservations),
+        "total_revenue": round(total_revenue, 2),
+        "total_commission": round(total_commission, 2),
+        "commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
+        "total_payout": round(total_payout, 2),
+        "pending_payout": round(total_payout, 2),  # Simplified - could track actual payments
+        "message": f"Comisionul de {PLATFORM_COMMISSION_PERCENTAGE}% este dedus automat din încasări."
+    }
+
 # ==================== SUPPORT ====================
 
 @api_router.get("/support/info")
