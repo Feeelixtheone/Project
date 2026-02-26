@@ -1818,6 +1818,42 @@ async def admin_get_stats(user: User = Depends(require_admin)):
         "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE
     }
 
+@api_router.get("/admin/restaurants")
+async def admin_get_all_restaurants(user: User = Depends(require_admin)):
+    """Admin: Get all restaurants"""
+    restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(500)
+    return restaurants
+
+@api_router.delete("/admin/restaurants/{restaurant_id}")
+async def admin_delete_restaurant(restaurant_id: str, user: User = Depends(require_admin)):
+    """Admin: Delete a restaurant"""
+    await db.restaurants.delete_one({"id": restaurant_id})
+    await db.company_stores.delete_one({"id": restaurant_id})
+    await db.store_products.delete_many({"store_id": restaurant_id})
+    return {"message": "Restaurantul a fost șters"}
+
+@api_router.delete("/admin/restaurants/{restaurant_id}/products/{product_id}")
+async def admin_delete_product(restaurant_id: str, product_id: str, user: User = Depends(require_admin)):
+    """Admin: Delete a product from a restaurant"""
+    await db.store_products.delete_one({"id": product_id, "store_id": restaurant_id})
+    await db.restaurants.update_one(
+        {"id": restaurant_id},
+        {"$pull": {"menu": {"id": product_id}}}
+    )
+    return {"message": "Produsul a fost șters"}
+
+@api_router.get("/admin/orders")
+async def admin_get_all_orders(user: User = Depends(require_admin)):
+    """Admin: Get all orders"""
+    orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return orders
+
+@api_router.get("/admin/reservations")
+async def admin_get_all_reservations(user: User = Depends(require_admin)):
+    """Admin: Get all reservations"""
+    reservations = await db.reservations.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return reservations
+
 # ==================== COMPANY ROUTES ====================
 
 @api_router.post("/companies/register")
