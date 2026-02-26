@@ -93,6 +93,26 @@ export default function CompanyDashboard() {
       if (companyData.is_verified) {
         const storesData = await apiRequest<any[]>('/api/stores/my');
         setStores(storesData);
+        
+        // Load notifications
+        try {
+          const notifs = await getCompanyNotifications();
+          setNotifications(notifs);
+        } catch (e) {}
+        
+        // Load orders for first store
+        if (storesData.length > 0) {
+          try {
+            const ordersData = await getStoreOrders(storesData[0].id);
+            setStoreOrders(ordersData);
+          } catch (e) {}
+        }
+        
+        // Load receipts
+        try {
+          const receiptsData = await getCompanyReceipts();
+          setReceipts(receiptsData);
+        } catch (e) {}
       }
     } catch (error) {
       // User might not have a company
@@ -100,6 +120,36 @@ export default function CompanyDashboard() {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleDeleteProduct = async (storeId: string, productId: string) => {
+    const doDelete = async () => {
+      try {
+        await deleteStoreProduct(storeId, productId);
+        loadData();
+      } catch (error: any) {
+        const msg = error.message || 'Nu s-a putut șterge produsul';
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+      }
+    };
+    
+    if (Platform.OS === 'web') {
+      if (window.confirm('Ești sigur că vrei să ștergi acest produs?')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Șterge produs', 'Ești sigur că vrei să ștergi acest produs?', [
+        { text: 'Nu', style: 'cancel' },
+        { text: 'Da, șterge', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+  
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+    } catch (e) {}
   };
 
   const handleCreateStore = async () => {
