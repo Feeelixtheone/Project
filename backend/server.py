@@ -831,8 +831,9 @@ async def create_reservation(
         ordered_items=ordered_items,
         food_total=food_total,
         upfront_fee=upfront_fee,
-        platform_fee=platform_fee,
+        platform_commission=platform_commission,
         total_paid=total_paid,
+        restaurant_payout=restaurant_payout,
         is_paid=True if data.payment_method_id else False,
         payment_method_id=data.payment_method_id,
         can_cancel=can_cancel,
@@ -841,15 +842,25 @@ async def create_reservation(
     )
     await db.reservations.insert_one(reservation.dict())
     
+    # Send notification to restaurant
+    await create_restaurant_notification(
+        restaurant_id=data.restaurant_id,
+        notification_type="new_reservation",
+        title="Rezervare nouă",
+        message=f"Ai primit o rezervare nouă de la {user.name} pentru {data.date} la {data.time}. {data.guests} persoane.",
+        data={"reservation_id": reservation.id}
+    )
+    
     return {
         "reservation": reservation.dict(),
         "payment_summary": {
             "reservation_type": data.reservation_type,
             "food_total": food_total,
             "upfront_fee": upfront_fee,
-            "platform_fee": platform_fee,
-            "platform_fee_percentage": TRANSACTION_FEE_PERCENTAGE,
             "total_paid": total_paid,
+            "platform_commission": platform_commission,
+            "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
+            "restaurant_payout": restaurant_payout,
             "can_cancel": can_cancel,
             "cancellation_deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
             "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Taxa în avans va fi dedusă din nota finală."
