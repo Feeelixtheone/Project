@@ -236,6 +236,9 @@ export default function RestaurantDetailScreen() {
 
   const cartItemCount = getItemCount();
 
+  // Add to cart toast
+  const [addedToCartMsg, setAddedToCartMsg] = useState('');
+
   const handleAddToCart = (menuItem: any) => {
     addItem({
       menuItemId: menuItem.id,
@@ -246,15 +249,9 @@ export default function RestaurantDetailScreen() {
       price: menuItem.price,
       imageUrl: menuItem.image_url || 'https://via.placeholder.com/80',
     });
-    if (Platform.OS === 'web') {
-      const goToCart = window.confirm(`${menuItem.name} a fost adăugat în coș. Mergi la coș?`);
-      if (goToCart) router.push('/cart');
-    } else {
-      Alert.alert('Adăugat în coș!', `${menuItem.name} a fost adăugat în coș.`, [
-        { text: 'Continuă', style: 'cancel' },
-        { text: 'Vezi coșul', onPress: () => router.push('/cart') },
-      ]);
-    }
+    setAddedToCartMsg(menuItem.name);
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => setAddedToCartMsg(''), 3000);
   };
 
   const renderMenuItem = ({ item }: { item: any }) => {
