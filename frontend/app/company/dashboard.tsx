@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { apiRequest, getCompanyNotifications, markAllNotificationsRead, getStoreOrders, deleteStoreProduct, getCompanyReceipts } from '../../src/utils/api';
+import { apiRequest, getCompanyNotifications, markAllNotificationsRead, getStoreOrders, deleteStoreProduct, getCompanyReceipts, createSpecialOffer } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 
 const PRODUCT_SECTIONS = [
