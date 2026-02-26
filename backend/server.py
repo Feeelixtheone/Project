@@ -1763,7 +1763,7 @@ async def admin_get_stats(user: User = Depends(require_admin)):
         "total_restaurants": total_restaurants,
         "total_reservations": total_reservations,
         "total_transactions": total_transactions,
-        "transaction_fee_percentage": PLATFORM_COMMISSION_PERCENTAGE
+        "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE
     }
 
 # ==================== COMPANY ROUTES ====================
