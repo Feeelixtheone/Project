@@ -795,10 +795,13 @@ async def create_reservation(
     if data.reservation_type == "table_only":
         upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
     
-    # Calculate platform fee (1.7%)
+    # Calculate platform commission (2.7%) - deducted from restaurant, NOT charged to user
     base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
-    platform_fee = round(base_amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
-    total_paid = round(base_amount + platform_fee, 2)
+    platform_commission = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
+    # User pays only the base amount (no commission)
+    total_paid = base_amount
+    # Restaurant receives base amount minus commission
+    restaurant_payout = round(base_amount - platform_commission, 2)
     
     # Calculate cancellation deadline for food_ready (1 hour before)
     cancellation_deadline = None
