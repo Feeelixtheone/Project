@@ -335,8 +335,8 @@ export default function RezervariScreen() {
             </Text>
           </View>
           <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>Comision platformă (1.7%)</Text>
-            <Text style={styles.paymentValue}>{item.platform_fee} RON</Text>
+            <Text style={styles.paymentLabel}>Comision platformă (2.7%) - dedus din restaurant</Text>
+            <Text style={styles.paymentValue}>{item.platform_fee || item.platform_commission} RON</Text>
           </View>
           <View style={[styles.paymentRow, styles.paymentTotal]}>
             <Text style={styles.paymentTotalLabel}>Total plătit</Text>
