@@ -118,49 +118,30 @@ export default function RezervariScreen() {
 
   const handleCancel = (reservationId: string, reservation: any) => {
     // Check if can cancel
-    if (!reservation.can_cancel) {
-      const message = reservation.reservation_type === 'food_ready' 
+    if (reservation.can_cancel === false) {
+      setCancelError(
+        reservation.reservation_type === 'food_ready' 
           ? 'Rezervările cu mâncare gata nu pot fi anulate cu mai puțin de 1 oră înainte.'
-          : 'Această rezervare nu poate fi anulată.';
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert('Nu se poate anula', message);
-      }
+          : 'Această rezervare nu poate fi anulată.'
+      );
       return;
     }
+    // Show confirmation modal
+    setCancelTarget({ id: reservationId, reservation });
+  };
 
-    const doCancelAsync = async () => {
-      try {
-        await cancelReservation(reservationId);
-        loadReservations();
-      } catch (error: any) {
-        const errMsg = error.message || 'Nu s-a putut anula rezervarea';
-        if (Platform.OS === 'web') {
-          window.alert(errMsg);
-        } else {
-          Alert.alert('Eroare', errMsg);
-        }
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Ești sigur că vrei să anulezi această rezervare?')) {
-        doCancelAsync();
-      }
-    } else {
-      Alert.alert(
-        'Anulează rezervarea',
-        'Ești sigur că vrei să anulezi această rezervare?',
-        [
-          { text: 'Nu', style: 'cancel' },
-          {
-            text: 'Da, anulează',
-            style: 'destructive',
-            onPress: doCancelAsync,
-          },
-        ]
-      );
+  const confirmCancelReservation = async () => {
+    if (!cancelTarget) return;
+    setIsCancelling(true);
+    try {
+      await cancelReservation(cancelTarget.id);
+      setCancelTarget(null);
+      loadReservations();
+    } catch (error: any) {
+      setCancelError(error.message || 'Nu s-a putut anula rezervarea');
+      setCancelTarget(null);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
