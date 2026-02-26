@@ -99,28 +99,23 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRejectCompany = async (companyId: string) => {
-    Alert.prompt(
-      'Respinge firma',
-      'Introdu motivul respingerii (opțional)',
-      [
-        { text: 'Anulează', style: 'cancel' },
-        {
-          text: 'Respinge',
-          style: 'destructive',
-          onPress: async (reason) => {
-            try {
-              await apiRequest(`/api/admin/companies/${companyId}/reject?reason=${reason || ''}`, { method: 'PUT' });
-              Alert.alert('Succes', 'Firma a fost respinsă');
-              loadData();
-            } catch (error) {
-              Alert.alert('Eroare', 'Nu s-a putut respinge firma');
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
+  const handleRejectCompany = (companyId: string) => {
+    setRejectCompanyId(companyId);
+    setRejectReason('');
+    setShowRejectModal(true);
+  };
+
+  const handleSubmitReject = async () => {
+    try {
+      await apiRequest(`/api/admin/companies/${rejectCompanyId}/reject?reason=${rejectReason || ''}`, { method: 'PUT' });
+      Alert.alert('Succes', 'Firma a fost respinsă');
+      setShowRejectModal(false);
+      setRejectCompanyId('');
+      setRejectReason('');
+      loadData();
+    } catch (error) {
+      Alert.alert('Eroare', 'Nu s-a putut respinge firma');
+    }
   };
 
   const handleDeleteCompany = async (companyId: string, companyName: string) => {
