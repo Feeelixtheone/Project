@@ -81,8 +81,47 @@ export default function AdminDashboard() {
       setStats(statsData);
       setCompanies(companiesData);
       setPendingCompanies(pendingData);
+      
+      // Load admin notifications
+      try {
+        const notifs = await getAdminNotifications();
+        setAdminNotifications(notifs);
+      } catch (e) {}
+      
+      // Load restaurants
+      try {
+        const rests = await getAdminRestaurants();
+        setRestaurants(rests);
+      } catch (e) {}
     } catch (error) {
       console.error('Error loading admin data:', error);
+    }
+  };
+  
+  const handleDeleteRestaurant = async (restaurantId: string, name: string) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Sigur vrei să ștergi restaurantul "${name}"?`)) {
+        try {
+          await deleteAdminRestaurant(restaurantId);
+          loadData();
+        } catch (e: any) {
+          window.alert(e.message || 'Nu s-a putut șterge');
+        }
+      }
+    } else {
+      Alert.alert('Șterge restaurant', `Sigur vrei să ștergi "${name}"?`, [
+        { text: 'Nu', style: 'cancel' },
+        {
+          text: 'Da', style: 'destructive', onPress: async () => {
+            try {
+              await deleteAdminRestaurant(restaurantId);
+              loadData();
+            } catch (e: any) {
+              Alert.alert('Eroare', e.message);
+            }
+          }
+        },
+      ]);
     }
   };
 
