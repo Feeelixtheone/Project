@@ -398,7 +398,7 @@ export default function CompanyDashboard() {
 
         {/* Section Tabs */}
         <View style={styles.sectionTabs}>
-          {(['stores', 'notifications', 'orders', 'receipts'] as const).map((tab) => (
+          {(['stores', 'notifications', 'orders', 'receipts', 'offers'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.sectionTab, activeSection === tab && styles.sectionTabActive]}
