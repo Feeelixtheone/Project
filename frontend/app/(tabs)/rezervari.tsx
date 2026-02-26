@@ -375,6 +375,7 @@ export default function RezervariScreen() {
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => handleCancel(item.id, item)}
+          data-testid={`cancel-reservation-${item.id}`}
         >
           <Ionicons name="close-circle-outline" size={18} color={COLORS.error} />
           <Text style={styles.cancelButtonText}>Anulează rezervarea</Text>
