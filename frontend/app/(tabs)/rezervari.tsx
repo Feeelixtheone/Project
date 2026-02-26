@@ -114,34 +114,49 @@ export default function RezervariScreen() {
   const handleCancel = (reservationId: string, reservation: any) => {
     // Check if can cancel
     if (!reservation.can_cancel) {
-      Alert.alert(
-        'Nu se poate anula',
-        reservation.reservation_type === 'food_ready' 
+      const message = reservation.reservation_type === 'food_ready' 
           ? 'Rezervările cu mâncare gata nu pot fi anulate cu mai puțin de 1 oră înainte.'
-          : 'Această rezervare nu poate fi anulată.'
-      );
+          : 'Această rezervare nu poate fi anulată.';
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('Nu se poate anula', message);
+      }
       return;
     }
 
-    Alert.alert(
-      'Anulează rezervarea',
-      'Ești sigur că vrei să anulezi această rezervare?',
-      [
-        { text: 'Nu', style: 'cancel' },
-        {
-          text: 'Da, anulează',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelReservation(reservationId);
-              loadReservations();
-            } catch (error: any) {
-              Alert.alert('Eroare', error.message || 'Nu s-a putut anula rezervarea');
-            }
+    const doCancelAsync = async () => {
+      try {
+        await cancelReservation(reservationId);
+        loadReservations();
+      } catch (error: any) {
+        const errMsg = error.message || 'Nu s-a putut anula rezervarea';
+        if (Platform.OS === 'web') {
+          window.alert(errMsg);
+        } else {
+          Alert.alert('Eroare', errMsg);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Ești sigur că vrei să anulezi această rezervare?')) {
+        doCancelAsync();
+      }
+    } else {
+      Alert.alert(
+        'Anulează rezervarea',
+        'Ești sigur că vrei să anulezi această rezervare?',
+        [
+          { text: 'Nu', style: 'cancel' },
+          {
+            text: 'Da, anulează',
+            style: 'destructive',
+            onPress: doCancelAsync,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleCreateReservation = async () => {
