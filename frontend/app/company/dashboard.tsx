@@ -406,12 +406,12 @@ export default function CompanyDashboard() {
               data-testid={`company-tab-${tab}`}
             >
               <Ionicons
-                name={tab === 'stores' ? 'restaurant' : tab === 'notifications' ? 'notifications' : tab === 'orders' ? 'receipt' : 'document-text'}
+                name={tab === 'stores' ? 'restaurant' : tab === 'notifications' ? 'notifications' : tab === 'orders' ? 'receipt' : tab === 'offers' ? 'pricetag' : 'document-text'}
                 size={18}
                 color={activeSection === tab ? COLORS.primary : COLORS.textMuted}
               />
               <Text style={[styles.sectionTabText, activeSection === tab && styles.sectionTabTextActive]}>
-                {tab === 'stores' ? 'Restaurante' : tab === 'notifications' ? 'Notificări' : tab === 'orders' ? 'Comenzi' : 'Facturi'}
+                {tab === 'stores' ? 'Restaurante' : tab === 'notifications' ? 'Notificări' : tab === 'orders' ? 'Comenzi' : tab === 'offers' ? 'Oferte' : 'Facturi'}
               </Text>
               {tab === 'notifications' && notifications.filter(n => !n.is_read).length > 0 && (
                 <View style={styles.notifBadge}>
