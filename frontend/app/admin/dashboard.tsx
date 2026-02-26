@@ -532,6 +532,33 @@ export default function AdminDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Reject Company Modal */}
+      <Modal visible={showRejectModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + SPACING.md }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Respinge firma</Text>
+              <TouchableOpacity onPress={() => { setShowRejectModal(false); setRejectReason(''); }}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.formLabel}>Motivul respingerii (opțional)</Text>
+            <TextInput
+              style={[styles.formInput, { minHeight: 80, textAlignVertical: 'top' }]}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              placeholder="Introdu motivul respingerii..."
+              placeholderTextColor={COLORS.textMuted}
+              multiline
+              numberOfLines={3}
+            />
+            <TouchableOpacity style={[styles.submitButton, { backgroundColor: COLORS.error }]} onPress={handleSubmitReject}>
+              <Text style={styles.submitButtonText}>Respinge Firma</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
