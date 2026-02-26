@@ -1861,7 +1861,7 @@ async def register_company(
     data: CompanyRegister,
     user: User = Depends(require_auth)
 ):
-    """Register as a company"""
+    """Register as a company - requires admin approval"""
     # Check if user already has a company
     existing = await db.companies.find_one({"owner_id": user.user_id})
     if existing:
@@ -1872,12 +1872,17 @@ async def register_company(
     if cui_exists:
         raise HTTPException(status_code=400, detail="Acest CUI este deja înregistrat")
     
+    # Verify CUI through ANAF
+    anaf_data = await verify_cui_anaf(data.cui)
+    
     company = Company(
         owner_id=user.user_id,
         company_name=data.company_name,
         cui=data.cui,
         email=data.email,
-        phone=data.phone
+        phone=data.phone,
+        anaf_data=anaf_data if anaf_data.get("valid") else None,
+        anaf_verified=anaf_data.get("valid", False)
     )
     await db.companies.insert_one(company.dict())
     
