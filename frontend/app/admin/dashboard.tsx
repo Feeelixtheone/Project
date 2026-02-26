@@ -33,6 +33,9 @@ export default function AdminDashboard() {
   // Modals
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showVerifyCUI, setShowVerifyCUI] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectCompanyId, setRejectCompanyId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
   
   // Create company form
   const [companyName, setCompanyName] = useState('');
