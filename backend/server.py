@@ -101,6 +101,8 @@ class Company(BaseModel):
     email: str
     phone: str
     is_verified: bool = False  # Admin verification status
+    anaf_verified: bool = False  # Whether CUI was verified through ANAF
+    anaf_data: Optional[Dict] = None  # Data from ANAF API
     verification_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
