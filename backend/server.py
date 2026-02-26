@@ -2469,7 +2469,7 @@ async def create_reservation_with_payment(
         ordered_items=ordered_items,
         food_total=food_total,
         upfront_fee=upfront_fee,
-        platform_fee=platform_fee,
+        platform_commission=platform_fee,
         total_paid=total_to_pay,
         restaurant_payout=restaurant_payout,
         is_paid=False,
