@@ -86,16 +86,19 @@ export default function RestaurantDetailScreen() {
       setRestaurant(restaurantData);
       setReviews(reviewsData);
       
-      // Check if liked
+      // Load extra data in parallel
       try {
-        const likedResult = await checkLiked(id!);
-        setIsLiked(likedResult.liked);
-      } catch (e) {
-        // User might not be logged in
-      }
+        const [likedResult, offersResult, feedbackResult] = await Promise.all([
+          checkFavorite(id!).catch(() => ({ is_favorite: false })),
+          getRestaurantOffers(id!).catch(() => []),
+          getRestaurantFeedback(id!).catch(() => []),
+        ]);
+        setIsLiked(likedResult.is_favorite);
+        setSpecialOffers(offersResult);
+        setFeedbackList(feedbackResult);
+      } catch (e) {}
     } catch (error) {
       console.error('Error loading restaurant:', error);
-      Alert.alert('Eroare', 'Nu s-a putut încărca restaurantul');
     } finally {
       setIsLoading(false);
     }
