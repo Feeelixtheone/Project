@@ -452,8 +452,11 @@ export default function AdminDashboard() {
             ))}
           </View>
         )}
+        </>
+        )} {/* End of activeAdminTab === 'overview' */}
 
         {/* All Companies */}
+        {(activeAdminTab === 'overview' || activeAdminTab === 'companies') && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             Toate firmele ({companies.length})
