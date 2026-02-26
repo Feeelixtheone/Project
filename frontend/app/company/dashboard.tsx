@@ -56,6 +56,11 @@ export default function CompanyDashboard() {
   const [image3DUrl, setImage3DUrl] = useState('');
   const [selectedStoreFor3D, setSelectedStoreFor3D] = useState<string>('');
 
+  // Notifications & Orders
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [storeOrders, setStoreOrders] = useState<any>({ orders: [], reservations: [] });
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [activeSection, setActiveSection] = useState<'stores' | 'notifications' | 'orders' | 'receipts'>('stores');
   // Store form
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
