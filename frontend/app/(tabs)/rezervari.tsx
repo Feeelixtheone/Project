@@ -56,6 +56,11 @@ export default function RezervariScreen() {
   // Restaurant selector
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
 
+  // Cancel confirmation
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; reservation: any } | null>(null);
+  const [cancelError, setCancelError] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
   // Handle prefill from cart
   useEffect(() => {
     if (params.prefill_restaurant_id && params.prefill_type === 'food_ready') {
