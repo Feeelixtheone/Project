@@ -26,12 +26,23 @@ Restaurant reservation/ordering platform with multiple bug fixes and feature add
 1. **Cancel reservation 1h before** - Fixed Platform.OS web compatibility for Alert dialogs
 2. **Cart not showing items** - Rewrote cartStore without AsyncStorage persist (web incompatible), simplified zustand store
 3. **Cart payment** - Cart now directly creates Stripe checkout via /api/orders/create
-4. **Trash button** - Fixed by using Platform.OS === 'web' ? window.confirm : Alert.alert
-5. **Commission 2.7%** - Updated from 1.7% to 2.7% in all frontend displays, backend was already 2.7%
-6. **User NOT paying commission** - Fixed: user pays base amount only, commission deducted from restaurant payout
-7. **Company registration broken** - Added registration modal in profile page with CUI, email, phone fields
-8. **Frontend syntax error** - Fixed stray `]);` in restaurant/[id].tsx
-9. **Frontend start script** - Fixed to use `expo start --web --port 3000` instead of `expo start`
+4. **Trash button / Clear all button** - Replaced window.confirm with React Modal confirmation dialog
+5. **Anulează rezervarea button** - Replaced window.confirm/window.alert with React Modal-based confirmation and error dialogs
+6. **Commission 2.7%** - Updated from 1.7% to 2.7% in all frontend displays
+7. **User NOT paying commission** - Fixed: user pays base amount only, commission deducted from restaurant payout
+8. **20 RON fixed price** - Button now shows actual amount: "Plătește X.XX RON" based on selected items or "Plătește 20.00 RON (avans)" for table_only
+9. **Company registration broken** - Added registration modal in profile page with CUI, ANAF verification
+10. **Stripe checkout popup blocked** - Changed from window.open to window.location.href
+11. **Add to cart feedback** - Replaced window.confirm with visual toast notification banner
+
+### Iteration 2 Fixes (2026-02-26)
+- Replaced ALL window.confirm/window.alert with React Modal-based confirmations
+- Added Pressable components for better web click handling
+- Cart clear shows modal: "Golește coșul?"
+- Cancel reservation shows modal: "Anulează rezervarea?" with loading state
+- Error dialogs for "cannot cancel" shown as proper modals
+- Stripe checkout redirect changed from window.open to window.location.href
+- Reservation submit button shows actual price amount
 
 ### Features Added (P1)
 1. **Notification system** - In-app notifications for restaurants on new orders/reservations/payments
