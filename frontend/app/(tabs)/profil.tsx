@@ -436,7 +436,7 @@ export default function ProfilScreen() {
         </View>
         <View style={styles.feeInfo}>
           <Ionicons name="cash-outline" size={18} color={COLORS.gold} />
-          <Text style={styles.feeInfoText}>Comision platformă: <Text style={styles.feeBold}>1.7%</Text> din achiziții</Text>
+          <Text style={styles.feeInfoText}>Comision platformă: <Text style={styles.feeBold}>2.7%</Text> dedus din încasările restaurantelor</Text>
         </View>
       </View>
 
