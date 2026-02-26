@@ -558,6 +558,7 @@ export default function CompanyDashboard() {
             ))
           )}
         </View>
+        )} {/* End of activeSection === 'stores' */}
 
         {/* 3D Photography Info */}
         <View style={styles.info3dBox}>
