@@ -2364,6 +2364,11 @@ async def stripe_webhook(request: Request):
         
         if webhook_response.payment_status == "paid":
             # Update transaction
+            tx = await db.payment_transactions.find_one(
+                {"session_id": webhook_response.session_id},
+                {"_id": 0}
+            )
+            
             await db.payment_transactions.update_one(
                 {"session_id": webhook_response.session_id},
                 {
@@ -2374,6 +2379,47 @@ async def stripe_webhook(request: Request):
                     }
                 }
             )
+            
+            if tx:
+                metadata = tx.get("metadata", {})
+                restaurant_id = metadata.get("restaurant_id", "")
+                restaurant_name = metadata.get("restaurant_name", "")
+                user_email = metadata.get("user_email", "")
+                tx_type = metadata.get("type", "")
+                
+                # Create notification for restaurant
+                if restaurant_id:
+                    if tx_type == "direct_order":
+                        order_id = metadata.get("order_id", "")
+                        # Update order status
+                        await db.orders.update_one(
+                            {"id": order_id},
+                            {"$set": {"status": "confirmed", "paid_at": datetime.now(timezone.utc)}}
+                        )
+                        await create_restaurant_notification(
+                            restaurant_id=restaurant_id,
+                            notification_type="new_order",
+                            title="Comandă nouă plătită",
+                            message=f"Ai primit o comandă nouă plătită de la {user_email}.",
+                            data={"order_id": order_id}
+                        )
+                    else:
+                        reservation_id = metadata.get("reservation_id", "")
+                        if reservation_id:
+                            await db.reservations.update_one(
+                                {"id": reservation_id},
+                                {"$set": {"is_paid": True, "status": "confirmed", "payment_confirmed_at": datetime.now(timezone.utc)}}
+                            )
+                            await create_restaurant_notification(
+                                restaurant_id=restaurant_id,
+                                notification_type="reservation_paid",
+                                title="Rezervare plătită",
+                                message=f"Rezervarea de la {user_email} a fost plătită.",
+                                data={"reservation_id": reservation_id}
+                            )
+                    
+                    # Generate receipt based on company CUI
+                    await generate_receipt_for_payment(tx)
         
         return {"received": True}
         
