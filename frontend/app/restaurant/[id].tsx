@@ -408,6 +408,36 @@ export default function RestaurantDetailScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Added to Cart Toast */}
+      {addedToCartMsg ? (
+        <Pressable
+          onPress={() => router.push('/cart')}
+          style={{
+            position: 'absolute',
+            top: insets.top + 60,
+            left: SPACING.lg,
+            right: SPACING.lg,
+            zIndex: 999,
+            backgroundColor: COLORS.success || '#2ecc71',
+            borderRadius: BORDER_RADIUS.md,
+            padding: SPACING.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: SPACING.sm,
+            ...SHADOWS.md,
+          }}
+          data-testid="added-to-cart-toast"
+        >
+          <Ionicons name="checkmark-circle" size={22} color="#fff" />
+          <Text style={{ flex: 1, fontFamily: FONTS.semiBold, fontSize: 14, color: '#fff' }}>
+            {addedToCartMsg} adaugat in cos
+          </Text>
+          <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: '#fff', textDecorationLine: 'underline' }}>
+            Vezi cosul
+          </Text>
+        </Pressable>
+      ) : null}
+
       {/* Header Image */}
       <View style={styles.headerImage}>
         <Image source={{ uri: restaurant.cover_image }} style={styles.coverImage} />
