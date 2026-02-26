@@ -106,61 +106,6 @@ export default function ProfilScreen() {
     }
   };
 
-  const handleAddCard = () => {
-    setCardLastFour('');
-    setCardExpiryMonth('');
-    setCardExpiryYear('');
-    setCardType('visa');
-    setShowAddCardModal(true);
-  };
-
-  const handleSubmitCard = async () => {
-    if (!cardLastFour || cardLastFour.length !== 4 || !/^\d{4}$/.test(cardLastFour)) {
-      Alert.alert('Eroare', 'Introdu exact 4 cifre valide');
-      return;
-    }
-    if (!cardExpiryMonth || !cardExpiryYear) {
-      Alert.alert('Eroare', 'Completează luna și anul expirării');
-      return;
-    }
-    try {
-      await addPaymentMethod({
-        card_type: cardType,
-        last_four: cardLastFour,
-        expiry_month: cardExpiryMonth,
-        expiry_year: cardExpiryYear,
-        is_default: paymentMethods.length === 0,
-      });
-      setShowAddCardModal(false);
-      loadPaymentMethods();
-      Alert.alert('Succes', 'Cardul a fost adăugat!');
-    } catch (error) {
-      Alert.alert('Eroare', 'Nu s-a putut adăuga cardul');
-    }
-  };
-
-  const handleDeleteCard = (id: string) => {
-    Alert.alert(
-      'Șterge card',
-      'Ești sigur că vrei să ștergi acest card?',
-      [
-        { text: 'Nu', style: 'cancel' },
-        {
-          text: 'Da, șterge',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deletePaymentMethod(id);
-              loadPaymentMethods();
-            } catch (error) {
-              Alert.alert('Eroare', 'Nu s-a putut șterge cardul');
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleLogout = () => {
     Alert.alert(
       'Deconectare',
