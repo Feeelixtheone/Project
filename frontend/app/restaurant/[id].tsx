@@ -140,11 +140,10 @@ export default function RestaurantDetailScreen() {
 
   const handleLike = async () => {
     try {
-      const result = await toggleLike(id!);
-      setIsLiked(result.liked);
-      loadData();
+      const result = await toggleFavorite(id!);
+      setIsLiked(result.is_favorite);
     } catch (error) {
-      Alert.alert('Eroare', 'Trebuie să fii autentificat');
+      console.error('Error toggling favorite:', error);
     }
   };
 
