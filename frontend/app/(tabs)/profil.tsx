@@ -103,6 +103,60 @@ export default function ProfilScreen() {
     }
   };
 
+  const loadExtras = async () => {
+    try {
+      const [favs, pending, notifs] = await Promise.all([
+        getFavorites().catch(() => []),
+        getPendingFeedback().catch(() => ({ orders: [], reservations: [] })),
+        getUserNotifications().catch(() => []),
+      ]);
+      setFavorites(favs);
+      setPendingFeedback(pending);
+      setUserNotifications(notifs);
+    } catch (e) {}
+  };
+
+  const openFeedbackFor = (item: any, type: 'order' | 'reservation') => {
+    setFeedbackTarget({ ...item, type });
+    setFeedbackRating(5);
+    setFeedbackFoodRating(5);
+    setFeedbackServiceRating(5);
+    setFeedbackComment('');
+    setFeedbackRecommend(true);
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackTarget) return;
+    setIsSubmittingFeedback(true);
+    try {
+      await submitFeedback({
+        order_id: feedbackTarget.type === 'order' ? feedbackTarget.id : undefined,
+        reservation_id: feedbackTarget.type === 'reservation' ? feedbackTarget.id : undefined,
+        restaurant_id: feedbackTarget.restaurant_id,
+        rating: feedbackRating,
+        food_rating: feedbackFoodRating,
+        service_rating: feedbackServiceRating,
+        comment: feedbackComment,
+        would_recommend: feedbackRecommend,
+      });
+      setShowFeedbackModal(false);
+      loadExtras();
+    } catch (error: any) {
+      const msg = error.message || 'Nu s-a putut trimite feedback';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  const handleMarkAllUserNotifsRead = async () => {
+    try {
+      await markUserNotificationsRead();
+      setUserNotifications(n => n.map(x => ({ ...x, is_read: true })));
+    } catch (e) {}
+  };
+
   const handleSaveProfile = async () => {
     try {
       setIsLoading(true);
