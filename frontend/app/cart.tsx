@@ -121,8 +121,7 @@ export default function CartScreen() {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {groupedItems.map((group) => {
             const groupSubtotal = group.items.reduce((s, i) => s + i.price * i.quantity, 0);
-            const groupFee = Math.round(groupSubtotal * (PLATFORM_FEE / 100) * 100) / 100;
-            const groupTotal = Math.round((groupSubtotal + groupFee) * 100) / 100;
+            const groupTotal = groupSubtotal;
 
             return (
               <View key={group.restaurantId} style={styles.restaurantGroup}>
@@ -169,18 +168,10 @@ export default function CartScreen() {
                   </View>
                 ))}
 
-                {/* Group Summary */}
+                {/* Group Summary - No platform fee for user */}
                 <View style={styles.groupSummary}>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Subtotal</Text>
-                    <Text style={styles.summaryValue}>{groupSubtotal.toFixed(2)} RON</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Comision ({PLATFORM_FEE}%)</Text>
-                    <Text style={styles.summaryValue}>{groupFee.toFixed(2)} RON</Text>
-                  </View>
                   <View style={[styles.summaryRow, styles.totalRow]}>
-                    <Text style={styles.totalLabel}>Total</Text>
+                    <Text style={styles.totalLabel}>Total de plată</Text>
                     <Text style={styles.totalValue}>{groupTotal.toFixed(2)} RON</Text>
                   </View>
                 </View>
