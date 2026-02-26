@@ -2435,10 +2435,11 @@ async def create_reservation_with_payment(
     if data.reservation_type == "table_only":
         upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
     
-    # Determine payment amount
+    # Determine payment amount - User pays base_amount only, commission deducted from restaurant
     base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
     platform_fee = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-    total_to_pay = round(base_amount + platform_fee, 2)
+    total_to_pay = base_amount  # User pays only the base amount, NO commission
+    restaurant_payout = round(base_amount - platform_fee, 2)
     
     # Calculate cancellation deadline for food_ready (1 hour before)
     cancellation_deadline = None
