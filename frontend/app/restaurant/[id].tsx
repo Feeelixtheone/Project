@@ -255,7 +255,6 @@ export default function RestaurantDetailScreen() {
         { text: 'Vezi coșul', onPress: () => router.push('/cart') },
       ]);
     }
-    ]);
   };
 
   const renderMenuItem = ({ item }: { item: any }) => {
