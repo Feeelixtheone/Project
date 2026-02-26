@@ -1038,4 +1038,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.error,
   },
+  adminTabs: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    flexWrap: 'wrap',
+  },
+  adminTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  adminTabActive: {
+    backgroundColor: COLORS.primary + '20',
+    borderColor: COLORS.primary,
+  },
+  adminTabText: {
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  adminTabTextActive: {
+    color: COLORS.primary,
+  },
 });
