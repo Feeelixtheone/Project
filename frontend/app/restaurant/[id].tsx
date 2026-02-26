@@ -849,6 +849,28 @@ export default function RestaurantDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Fullscreen Image Modal */}
+      <Modal
+        visible={showFullscreenImage}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowFullscreenImage(false)}
+      >
+        <View style={styles.fullscreenOverlay}>
+          <TouchableOpacity
+            style={styles.fullscreenCloseBtn}
+            onPress={() => setShowFullscreenImage(false)}
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: fullscreenImageUrl }}
+            style={styles.fullscreenImage}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
