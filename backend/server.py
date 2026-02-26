@@ -48,6 +48,8 @@ SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
 SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 ADMIN_EMAIL = "mutinyretreat37@gmail.com"
 
+ANAF_API_URL = "https://webservicesp.anaf.ro/PlatitorTvaRest/api/v8/ws/tva"
+
 # Stripe API Key
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
 
