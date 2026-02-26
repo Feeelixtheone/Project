@@ -306,10 +306,12 @@ class Reservation(BaseModel):
     # Payment details
     food_total: float = 0.0  # Total for pre-ordered food
     upfront_fee: float = 0.0  # Upfront fee for table_only
-    platform_fee: float = 0.0  # 1.7% platform fee
-    total_paid: float = 0.0  # Total amount paid
+    platform_commission: float = 0.0  # 2.7% platform commission (deducted from restaurant)
+    total_paid: float = 0.0  # Total amount paid by user (NO commission added)
+    restaurant_payout: float = 0.0  # Amount restaurant receives after commission
     is_paid: bool = False
     payment_method_id: Optional[str] = None
+    stripe_session_id: Optional[str] = None
     # Cancellation rules: food_ready cannot be cancelled within 1 hour
     can_cancel: bool = True
     cancellation_deadline: Optional[datetime] = None
