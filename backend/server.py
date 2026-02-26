@@ -1763,7 +1763,7 @@ async def admin_get_stats(user: User = Depends(require_admin)):
         "total_restaurants": total_restaurants,
         "total_reservations": total_reservations,
         "total_transactions": total_transactions,
-        "transaction_fee_percentage": TRANSACTION_FEE_PERCENTAGE
+        "transaction_fee_percentage": PLATFORM_COMMISSION_PERCENTAGE
     }
 
 # ==================== COMPANY ROUTES ====================
@@ -2040,7 +2040,7 @@ async def create_transaction(
                 "total": item_total
             })
     
-    fee_amount = round(subtotal * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    fee_amount = round(subtotal * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
     total = round(subtotal + fee_amount, 2)
     
     transaction = Transaction(
@@ -2056,10 +2056,10 @@ async def create_transaction(
     return {
         "transaction_id": transaction.id,
         "subtotal": subtotal,
-        "fee_percentage": TRANSACTION_FEE_PERCENTAGE,
+        "fee_percentage": PLATFORM_COMMISSION_PERCENTAGE,
         "fee_amount": fee_amount,
         "total": total,
-        "message": f"Comision platformă: {TRANSACTION_FEE_PERCENTAGE}% ({fee_amount} RON)"
+        "message": f"Comision platformă: {PLATFORM_COMMISSION_PERCENTAGE}% ({fee_amount} RON)"
     }
 
 @api_router.get("/transactions")
@@ -2101,7 +2101,7 @@ async def create_direct_order(
     
     # Calculate totals
     subtotal = sum(item.price * item.quantity for item in data.items)
-    platform_fee = round(subtotal * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    platform_fee = round(subtotal * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
     total = round(subtotal + platform_fee, 2)
     
     # Create order record
@@ -2230,7 +2230,7 @@ async def create_checkout_session(
             raise HTTPException(status_code=404, detail="Restaurant negăsit")
         
         # Calculate platform fee (1.7%)
-        platform_fee = round(data.amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+        platform_fee = round(data.amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
         total_amount = round(data.amount + platform_fee, 2)
         
         # Initialize Stripe
@@ -2435,7 +2435,7 @@ async def create_reservation_with_payment(
     
     # Determine payment amount
     base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
-    platform_fee = round(base_amount * (TRANSACTION_FEE_PERCENTAGE / 100), 2)
+    platform_fee = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
     total_to_pay = round(base_amount + platform_fee, 2)
     
     # Calculate cancellation deadline for food_ready (1 hour before)
