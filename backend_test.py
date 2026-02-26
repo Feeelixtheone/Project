@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 
 # Backend URL from frontend config
-BACKEND_URL = "https://credit-card-issue.preview.emergentagent.com/api"
+BACKEND_URL = "https://reservation-payments.preview.emergentagent.com/api"
 
 class RestaurantAppTester:
     def __init__(self):

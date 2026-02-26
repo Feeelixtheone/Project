@@ -269,7 +269,7 @@ frontend:
         comment: "Screenshot verified - logo, categories, company registration form with CUI validation"
       - working: true
         agent: "testing"
-        comment: "✓ TESTED: Welcome screen loads correctly at https://credit-card-issue.preview.emergentagent.com. All elements present: RestaurantApp logo, 'Continuă cu Google' button, 'Înregistrează-te ca firmă' button, food categories (Pizza, Aperitive, Sushi, Alcool, Exclusive), support email. Google login button is clickable and redirects to Emergent Auth OAuth page (auth.emergentagent.com). ✓ Backend API accessible (7 restaurants available)."
+        comment: "✓ TESTED: Welcome screen loads correctly at https://reservation-payments.preview.emergentagent.com. All elements present: RestaurantApp logo, 'Continuă cu Google' button, 'Înregistrează-te ca firmă' button, food categories (Pizza, Aperitive, Sushi, Alcool, Exclusive), support email. Google login button is clickable and redirects to Emergent Auth OAuth page (auth.emergentagent.com). ✓ Backend API accessible (7 restaurants available)."
 
   - task: "Google OAuth Login Flow"
     implemented: true
