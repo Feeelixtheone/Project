@@ -266,52 +266,42 @@ export default function ProfilScreen() {
     <View style={styles.tabContent}>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Metode de plată</Text>
-          <TouchableOpacity onPress={handleAddCard}>
-            <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Plăți securizate</Text>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.lg }} />
-        ) : paymentMethods.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="card-outline" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>Nu ai carduri salvate</Text>
-            <TouchableOpacity style={styles.addButton} onPress={handleAddCard}>
-              <Ionicons name="add" size={20} color={COLORS.text} />
-              <Text style={styles.addButtonText}>Adăugă card</Text>
-            </TouchableOpacity>
+        <View style={styles.stripeInfoCard}>
+          <View style={styles.stripeIconContainer}>
+            <Ionicons name="shield-checkmark" size={48} color={COLORS.success} />
           </View>
-        ) : (
-          <View style={styles.cardsList}>
-            {paymentMethods.map((method) => (
-              <View key={method.id} style={styles.cardItem}>
-                <View style={styles.cardIcon}>
-                  <Ionicons
-                    name={method.card_type === 'visa' ? 'card' : 'card-outline'}
-                    size={24}
-                    color={COLORS.primary}
-                  />
-                </View>
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardNumber}>**** **** **** {method.last_four}</Text>
-                  <Text style={styles.cardExpiry}>
-                    Expiră: {method.expiry_month}/{method.expiry_year}
-                  </Text>
-                </View>
-                {method.is_default && (
-                  <View style={styles.defaultBadge}>
-                    <Text style={styles.defaultText}>Principal</Text>
-                  </View>
-                )}
-                <TouchableOpacity onPress={() => handleDeleteCard(method.id)}>
-                  <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                </TouchableOpacity>
-              </View>
-            ))}
+          <Text style={styles.stripeTitle}>Plăți procesate prin Stripe</Text>
+          <Text style={styles.stripeDescription}>
+            Plățile tale sunt procesate securizat prin Stripe. Nu stocăm informații despre carduri pe serverele noastre.
+          </Text>
+          <View style={styles.stripeFeatures}>
+            <View style={styles.stripeFeature}>
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+              <Text style={styles.stripeFeatureText}>Criptare SSL</Text>
+            </View>
+            <View style={styles.stripeFeature}>
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+              <Text style={styles.stripeFeatureText}>PCI DSS compliant</Text>
+            </View>
+            <View style={styles.stripeFeature}>
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+              <Text style={styles.stripeFeatureText}>3D Secure</Text>
+            </View>
           </View>
-        )}
+        </View>
+
+        <View style={styles.paymentInfoCard}>
+          <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.paymentInfoTitle}>Cum funcționează?</Text>
+            <Text style={styles.paymentInfoText}>
+              La momentul rezervării sau comenzii, vei fi redirecționat către pagina securizată Stripe pentru a finaliza plata.
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
