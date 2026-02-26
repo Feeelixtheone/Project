@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { getPaymentMethods, addPaymentMethod, deletePaymentMethod, updateUser, apiRequest } from '../../src/utils/api';
+import { updateUser, apiRequest, registerCompany } from '../../src/utils/api';
 import { useCartStore } from '../../src/stores/cartStore';
 
 type TabType = 'profil' | 'plati' | 'setari';
@@ -25,7 +25,6 @@ export default function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, refreshUser, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('profil');
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [company, setCompany] = useState<any>(null);
   
@@ -35,17 +34,15 @@ export default function ProfilScreen() {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editAddress, setEditAddress] = useState(user?.address || '');
 
-  // Add card modal
-  const [showAddCardModal, setShowAddCardModal] = useState(false);
-  const [cardLastFour, setCardLastFour] = useState('');
-  const [cardExpiryMonth, setCardExpiryMonth] = useState('');
-  const [cardExpiryYear, setCardExpiryYear] = useState('');
-  const [cardType, setCardType] = useState('visa');
+  // Company registration
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [regCompanyName, setRegCompanyName] = useState('');
+  const [regCui, setRegCui] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
-    if (activeTab === 'plati') {
-      loadPaymentMethods();
-    }
     loadCompanyData();
   }, [activeTab]);
 
