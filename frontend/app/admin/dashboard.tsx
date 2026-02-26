@@ -311,6 +311,85 @@ export default function AdminDashboard() {
           </View>
         )}
 
+        {/* Admin Tabs */}
+        <View style={styles.adminTabs}>
+          {(['overview', 'companies', 'restaurants', 'notifications'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.adminTab, activeAdminTab === tab && styles.adminTabActive]}
+              onPress={() => setActiveAdminTab(tab)}
+              data-testid={`admin-tab-${tab}`}
+            >
+              <Text style={[styles.adminTabText, activeAdminTab === tab && styles.adminTabTextActive]}>
+                {tab === 'overview' ? 'General' : tab === 'companies' ? 'Firme' : tab === 'restaurants' ? 'Restaurante' : 'Notificări'}
+              </Text>
+              {tab === 'notifications' && adminNotifications.filter(n => !n.is_read).length > 0 && (
+                <View style={{ backgroundColor: COLORS.error, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontFamily: FONTS.bold }}>{adminNotifications.filter(n => !n.is_read).length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Restaurants Section (Admin) */}
+        {activeAdminTab === 'restaurants' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Toate Restaurantele ({restaurants.length})</Text>
+            {restaurants.map((rest: any) => (
+              <View key={rest.id} style={styles.companyCard} data-testid={`admin-restaurant-${rest.id}`}>
+                <View style={styles.companyHeader}>
+                  <View style={styles.companyInfo}>
+                    <Text style={styles.companyName}>{rest.name}</Text>
+                    <Text style={styles.companyCui}>{rest.address}</Text>
+                    <Text style={styles.companyCui}>Bucătărie: {rest.cuisine_type}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteRestaurant(rest.id, rest.name)} data-testid={`delete-restaurant-${rest.id}`}>
+                    <Ionicons name="trash" size={20} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
+                {rest.menu && rest.menu.length > 0 && (
+                  <View style={{ marginTop: SPACING.sm }}>
+                    <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.textSecondary }}>
+                      {rest.menu.length} produse
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Admin Notifications */}
+        {activeAdminTab === 'notifications' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notificări Admin</Text>
+            {adminNotifications.length === 0 ? (
+              <Text style={{ fontFamily: FONTS.regular, color: COLORS.textMuted, textAlign: 'center', padding: SPACING.lg }}>Nu ai notificări</Text>
+            ) : (
+              adminNotifications.map((notif: any) => (
+                <View key={notif.id} style={[styles.companyCard, !notif.is_read && { borderLeftWidth: 3, borderLeftColor: COLORS.primary }]} data-testid={`admin-notif-${notif.id}`}>
+                  <Text style={{ fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.text }}>{notif.title}</Text>
+                  <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary, marginTop: 4 }}>{notif.message}</Text>
+                  <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>{new Date(notif.created_at).toLocaleString('ro-RO')}</Text>
+                  {notif.company_id && !notif.is_read && (
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: SPACING.sm }}
+                      onPress={() => handleVerifyCompany(notif.company_id)}
+                      data-testid={`verify-from-notif-${notif.id}`}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color={COLORS.success} />
+                      <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: COLORS.success }}>Verifică firma</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {activeAdminTab === 'overview' && (
+        <>
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Acțiuni rapide</Text>
