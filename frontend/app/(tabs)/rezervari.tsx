@@ -754,6 +754,48 @@ export default function RezervariScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal visible={!!cancelTarget} transparent animationType="fade" onRequestClose={() => setCancelTarget(null)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmContent}>
+            <Ionicons name="warning" size={40} color={COLORS.warning} />
+            <Text style={styles.confirmTitle}>Anulează rezervarea?</Text>
+            <Text style={styles.confirmMessage}>Ești sigur că vrei să anulezi această rezervare? Această acțiune nu poate fi anulată.</Text>
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity style={styles.confirmBtnNo} onPress={() => setCancelTarget(null)} data-testid="cancel-reservation-no">
+                <Text style={styles.confirmBtnNoText}>Nu</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmBtnYes, isCancelling && { opacity: 0.6 }]} 
+                onPress={confirmCancelReservation} 
+                disabled={isCancelling}
+                data-testid="cancel-reservation-yes"
+              >
+                {isCancelling ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.confirmBtnYesText}>Da, anulează</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal visible={!!cancelError} transparent animationType="fade" onRequestClose={() => setCancelError('')}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmContent}>
+            <Ionicons name="close-circle" size={40} color={COLORS.error} />
+            <Text style={styles.confirmTitle}>Nu se poate anula</Text>
+            <Text style={styles.confirmMessage}>{cancelError}</Text>
+            <TouchableOpacity style={styles.confirmBtnNo} onPress={() => setCancelError('')} data-testid="cancel-error-ok">
+              <Text style={styles.confirmBtnNoText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
