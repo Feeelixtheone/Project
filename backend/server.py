@@ -2179,6 +2179,7 @@ async def create_direct_order(
             "session_id": session.session_id,
             "subtotal": subtotal,
             "platform_fee": platform_fee,
+            "restaurant_payout": restaurant_payout,
             "total": total,
             "currency": "RON"
         }
