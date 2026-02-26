@@ -43,7 +43,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constants
-TRANSACTION_FEE_PERCENTAGE = 1.7  # 1.7% fee on purchases
+PLATFORM_COMMISSION_PERCENTAGE = 2.7  # 2.7% commission deducted from restaurant
 SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
 SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 ADMIN_EMAIL = "mutinyretreat37@gmail.com"
