@@ -464,6 +464,34 @@ async def is_admin(user: User) -> bool:
     """Check if user is admin"""
     return user.email == ADMIN_EMAIL
 
+# ==================== NOTIFICATION HELPERS ====================
+
+async def create_restaurant_notification(
+    restaurant_id: str,
+    notification_type: str,
+    title: str,
+    message: str,
+    data: Optional[Dict] = None
+) -> RestaurantNotification:
+    """Create a notification for a restaurant"""
+    notification = RestaurantNotification(
+        restaurant_id=restaurant_id,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        data=data
+    )
+    await db.restaurant_notifications.insert_one(notification.dict())
+    return notification
+
+async def generate_receipt_number(company_cui: str) -> str:
+    """Generate a unique receipt number based on company CUI"""
+    # Get count of receipts for this company
+    count = await db.receipts.count_documents({"company_cui": company_cui})
+    # Format: CUI-YEAR-SEQUENCE
+    year = datetime.now().year
+    return f"{company_cui}-{year}-{str(count + 1).zfill(6)}"
+
 # ==================== ANAF CUI VERIFICATION ====================
 
 async def verify_cui_anaf(cui: str) -> dict:
