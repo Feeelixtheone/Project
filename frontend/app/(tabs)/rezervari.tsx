@@ -159,7 +159,7 @@ export default function RezervariScreen() {
 
     try {
       // Get current origin URL for Stripe redirects
-      const originUrl = BACKEND_URL || window?.location?.origin || 'https://app.local';
+      const originUrl = BACKEND_URL || (typeof window !== 'undefined' ? window.location?.origin : '') || 'https://app.local';
 
       const reservationData = {
         restaurant_id: selectedRestaurant.id,
@@ -181,12 +181,17 @@ export default function RezervariScreen() {
       
       // Open Stripe checkout
       if (result.payment?.checkout_url) {
-        // For mobile, we'll use Linking to open the checkout URL
-        const supported = await Linking.canOpenURL(result.payment.checkout_url);
-        if (supported) {
-          await Linking.openURL(result.payment.checkout_url);
+        // For web, try to open in new tab
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.open(result.payment.checkout_url, '_blank');
         } else {
-          Alert.alert('Eroare', 'Nu se poate deschide pagina de plată.');
+          // For mobile, use Linking
+          const supported = await Linking.canOpenURL(result.payment.checkout_url);
+          if (supported) {
+            await Linking.openURL(result.payment.checkout_url);
+          } else {
+            Alert.alert('Eroare', 'Nu se poate deschide pagina de plată.');
+          }
         }
       }
       
