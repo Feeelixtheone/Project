@@ -214,3 +214,50 @@ export const getAdminCompanies = () =>
 
 export const getAdminUsers = () =>
   apiRequest<any[]>('/api/admin/users');
+
+
+// Favorites APIs
+export const getFavorites = () =>
+  apiRequest<any[]>('/api/favorites');
+
+export const toggleFavorite = (restaurantId: string) =>
+  apiRequest<any>(`/api/favorites/${restaurantId}`, { method: 'POST' });
+
+export const checkFavorite = (restaurantId: string) =>
+  apiRequest<any>(`/api/favorites/check/${restaurantId}`);
+
+// Feedback APIs
+export const submitFeedback = (data: {
+  order_id?: string;
+  reservation_id?: string;
+  restaurant_id: string;
+  rating: number;
+  food_rating?: number;
+  service_rating?: number;
+  ambiance_rating?: number;
+  comment?: string;
+  would_recommend?: boolean;
+}) => apiRequest<any>('/api/feedback', { method: 'POST', body: data });
+
+export const getPendingFeedback = () =>
+  apiRequest<any>('/api/feedback/pending');
+
+export const getRestaurantFeedback = (restaurantId: string) =>
+  apiRequest<any[]>(`/api/feedback/restaurant/${restaurantId}`);
+
+// Special Offers APIs
+export const createSpecialOffer = (data: any) =>
+  apiRequest<any>('/api/offers', { method: 'POST', body: data });
+
+export const getRestaurantOffers = (restaurantId: string) =>
+  apiRequest<any[]>(`/api/offers/restaurant/${restaurantId}`);
+
+export const getAllActiveOffers = () =>
+  apiRequest<any[]>('/api/offers/active');
+
+// User Notifications
+export const getUserNotifications = () =>
+  apiRequest<any[]>('/api/user/notifications');
+
+export const markUserNotificationsRead = () =>
+  apiRequest<any>('/api/user/notifications/read-all', { method: 'PUT' });
