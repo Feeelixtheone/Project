@@ -161,6 +161,30 @@ export default function CompanyDashboard() {
     } catch (e) {}
   };
 
+  const handleCreateOffer = async () => {
+    if (!offerStoreId || !offerTitle || !offerDescription) return;
+    setIsCreatingOffer(true);
+    try {
+      const result = await createSpecialOffer({
+        restaurant_id: offerStoreId,
+        title: offerTitle,
+        description: offerDescription,
+        discount_percentage: offerDiscount ? parseFloat(offerDiscount) : undefined,
+      });
+      setShowOfferModal(false);
+      setOfferTitle('');
+      setOfferDescription('');
+      setOfferDiscount('');
+      const msg = result.message || 'Oferta a fost creata!';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
+    } catch (error: any) {
+      const msg = error.message || 'Nu s-a putut crea oferta';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setIsCreatingOffer(false);
+    }
+  };
+
   const handleCreateStore = async () => {
     if (!storeName || !storeAddress || !storeCoverImage || !storeCuisine) {
       Alert.alert('Eroare', 'Completează câmpurile obligatorii');
