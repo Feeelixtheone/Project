@@ -1937,6 +1937,82 @@ async def verify_company(company_id: str):
         raise HTTPException(status_code=404, detail="Firma nu a fost găsită")
     return {"message": "Firma a fost verificată cu succes"}
 
+
+# ==================== NOTIFICATION ROUTES ====================
+
+@api_router.get("/notifications/company")
+async def get_company_notifications(user: User = Depends(require_auth)):
+    """Get notifications for the current user's company/restaurants"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ai o firmă")
+    
+    notifications = await db.restaurant_notifications.find(
+        {"restaurant_id": {"$in": [s.get("id") for s in await db.company_stores.find({"company_id": company["id"]}, {"_id": 0, "id": 1}).to_list(100)]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return notifications
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: User = Depends(require_auth)):
+    """Mark a notification as read"""
+    await db.restaurant_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "Notificarea a fost marcată ca citită"}
+
+@api_router.put("/notifications/mark-all-read")
+async def mark_all_notifications_read(user: User = Depends(require_auth)):
+    """Mark all notifications as read for user's company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ai o firmă")
+    
+    store_ids = [s.get("id") for s in await db.company_stores.find({"company_id": company["id"]}, {"_id": 0, "id": 1}).to_list(100)]
+    
+    await db.restaurant_notifications.update_many(
+        {"restaurant_id": {"$in": store_ids}},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "Toate notificările au fost marcate ca citite"}
+
+# ==================== RECEIPT ROUTES ====================
+
+@api_router.get("/receipts/company")
+async def get_company_receipts(user: User = Depends(require_auth)):
+    """Get receipts for the current user's company"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Nu ai o firmă")
+    
+    receipts = await db.receipts.find(
+        {"company_id": company["id"]},
+        {"_id": 0}
+    ).sort("issued_date", -1).to_list(200)
+    
+    return receipts
+
+@api_router.get("/admin/notifications")
+async def get_admin_notifications(user: User = Depends(require_admin)):
+    """Get admin notifications"""
+    notifications = await db.admin_notifications.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return notifications
+
+@api_router.put("/admin/notifications/{notification_id}/read")
+async def mark_admin_notification_read(notification_id: str, user: User = Depends(require_admin)):
+    """Mark admin notification as read"""
+    await db.admin_notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "OK"}
+
+
 # ==================== COMPANY STORE ROUTES ====================
 
 @api_router.post("/stores")
