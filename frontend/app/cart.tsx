@@ -14,8 +14,6 @@ import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../src/constants/theme';
 import { useCartStore, CartItem } from '../src/stores/cartStore';
 
-const PLATFORM_FEE = 1.7;
-
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const items = useCartStore((s) => s.items);
