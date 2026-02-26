@@ -61,15 +61,30 @@ export default function ProfilScreen() {
     }
   };
 
-  const loadPaymentMethods = async () => {
+  const handleRegisterCompany = async () => {
+    if (!regCompanyName || !regCui || !regEmail || !regPhone) {
+      const msg = 'Completează toate câmpurile';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+      return;
+    }
+    
+    setIsRegistering(true);
     try {
-      setIsLoading(true);
-      const methods = await getPaymentMethods();
-      setPaymentMethods(methods);
-    } catch (error) {
-      console.error('Error loading payment methods:', error);
+      await registerCompany({
+        company_name: regCompanyName,
+        cui: regCui,
+        email: regEmail,
+        phone: regPhone,
+      });
+      setShowRegisterModal(false);
+      loadCompanyData();
+      const msg = 'Firma a fost înregistrată! Așteaptă verificarea de la admin.';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
+    } catch (error: any) {
+      const msg = error.message || 'Nu s-a putut înregistra firma';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
     } finally {
-      setIsLoading(false);
+      setIsRegistering(false);
     }
   };
 
