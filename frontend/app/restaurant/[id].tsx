@@ -245,9 +245,15 @@ export default function RestaurantDetailScreen() {
       price: menuItem.price,
       imageUrl: menuItem.image_url || 'https://via.placeholder.com/80',
     });
-    Alert.alert('Adăugat în coș!', `${menuItem.name} a fost adăugat în coș.`, [
-      { text: 'Continuă', style: 'cancel' },
-      { text: 'Vezi coșul', onPress: () => router.push('/cart') },
+    if (Platform.OS === 'web') {
+      const goToCart = window.confirm(`${menuItem.name} a fost adăugat în coș. Mergi la coș?`);
+      if (goToCart) router.push('/cart');
+    } else {
+      Alert.alert('Adăugat în coș!', `${menuItem.name} a fost adăugat în coș.`, [
+        { text: 'Continuă', style: 'cancel' },
+        { text: 'Vezi coșul', onPress: () => router.push('/cart') },
+      ]);
+    }
     ]);
   };
 
