@@ -492,6 +492,58 @@ async def generate_receipt_number(company_cui: str) -> str:
     year = datetime.now().year
     return f"{company_cui}-{year}-{str(count + 1).zfill(6)}"
 
+async def generate_receipt_for_payment(payment_tx: dict):
+    """Generate a receipt for a completed payment based on company CUI"""
+    try:
+        restaurant_id = payment_tx.get("metadata", {}).get("restaurant_id", "")
+        if not restaurant_id:
+            return
+        
+        # Find the restaurant and its company
+        restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+        if not restaurant:
+            return
+        
+        company_id = restaurant.get("company_id")
+        if not company_id:
+            return
+        
+        company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+        if not company:
+            return
+        
+        cui = company.get("cui", "")
+        platform_fee = float(payment_tx.get("platform_fee", 0) or payment_tx.get("metadata", {}).get("platform_fee", 0))
+        total_amount = payment_tx.get("amount", 0)
+        restaurant_payout = round(total_amount - platform_fee, 2)
+        
+        receipt_number = await generate_receipt_number(cui)
+        
+        receipt = {
+            "id": str(uuid.uuid4()),
+            "receipt_number": receipt_number,
+            "company_id": company_id,
+            "company_name": company.get("company_name", ""),
+            "company_cui": cui,
+            "restaurant_id": restaurant_id,
+            "restaurant_name": restaurant.get("name", ""),
+            "payment_transaction_id": payment_tx.get("id", ""),
+            "session_id": payment_tx.get("session_id", ""),
+            "user_id": payment_tx.get("user_id", ""),
+            "total_amount": total_amount,
+            "platform_commission": platform_fee,
+            "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
+            "restaurant_payout": restaurant_payout,
+            "currency": "RON",
+            "issued_date": datetime.now(timezone.utc),
+            "status": "issued"
+        }
+        
+        await db.receipts.insert_one(receipt)
+        logger.info(f"Receipt generated: {receipt_number} for CUI {cui}")
+    except Exception as e:
+        logger.error(f"Error generating receipt: {e}")
+
 # ==================== ANAF CUI VERIFICATION ====================
 
 async def verify_cui_anaf(cui: str) -> dict:
