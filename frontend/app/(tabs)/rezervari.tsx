@@ -699,7 +699,11 @@ export default function RezervariScreen() {
                 ) : (
                   <>
                     <Ionicons name="card" size={20} color={COLORS.text} />
-                    <Text style={styles.submitButtonText}>Continuă la plată</Text>
+                    <Text style={styles.submitButtonText}>
+                      {reservationType === 'food_ready' 
+                        ? `Plătește ${calculateFoodTotal().toFixed(2)} RON` 
+                        : `Plătește ${(selectedRestaurant?.upfront_fee || 20).toFixed(2)} RON (avans)`}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
