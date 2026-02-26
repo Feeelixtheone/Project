@@ -12,18 +12,21 @@ import {
   Modal,
   ActivityIndicator,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { getRestaurant, getReviews, createReview, createReservation, toggleLike, checkLiked } from '../../src/utils/api';
+import { getRestaurant, getReviews, createReview, createReservationWithPayment, toggleLike, checkLiked } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCartStore } from '../../src/stores/cartStore';
 import { DatePicker, TimePicker } from '../../src/components/DateTimePicker';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_BACKEND_URL || '';
 
 type TabType = 'meniu' | 'galerie' | 'recenzii';
 type ViewMode = '2d' | '3d' | 'video';
@@ -47,6 +50,9 @@ export default function RestaurantDetailScreen() {
   const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showFullscreenImage, setShowFullscreenImage] = useState(false);
+  const [fullscreenImageUrl, setFullscreenImageUrl] = useState('');
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   
   // Reservation form
   const [reservationDate, setReservationDate] = useState('');
