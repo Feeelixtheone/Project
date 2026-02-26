@@ -450,6 +450,99 @@ export default function ProfilScreen() {
         {activeTab === 'plati' && renderPaymentTab()}
         {activeTab === 'setari' && renderSettingsTab()}
       </ScrollView>
+
+      {/* Company Registration Modal */}
+      <Modal
+        visible={showRegisterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRegisterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Înregistrare firmă</Text>
+              <TouchableOpacity onPress={() => setShowRegisterModal(false)} data-testid="close-register-modal">
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Denumire firmă *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={regCompanyName}
+                  onChangeText={setRegCompanyName}
+                  placeholder="SC Exemplu SRL"
+                  placeholderTextColor={COLORS.textMuted}
+                  data-testid="reg-company-name"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>CUI (Cod Unic de Identificare) *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={regCui}
+                  onChangeText={setRegCui}
+                  placeholder="12345678"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="numeric"
+                  data-testid="reg-cui"
+                />
+                <Text style={styles.formHint}>Se va verifica automat prin ANAF</Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Email firmă *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={regEmail}
+                  onChangeText={setRegEmail}
+                  placeholder="contact@firma.ro"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="email-address"
+                  data-testid="reg-email"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Telefon firmă *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={regPhone}
+                  onChangeText={setRegPhone}
+                  placeholder="0721 234 567"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="phone-pad"
+                  data-testid="reg-phone"
+                />
+              </View>
+
+              <View style={styles.regInfoBox}>
+                <Ionicons name="information-circle" size={18} color={COLORS.primary} />
+                <Text style={styles.regInfoText}>
+                  După înregistrare, administratorul va primi o notificare și va verifica firma ta. Vei fi notificat când firma este aprobată.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.registerBtn, isRegistering && { opacity: 0.6 }]}
+              onPress={handleRegisterCompany}
+              disabled={isRegistering}
+              data-testid="submit-register-company"
+            >
+              {isRegistering ? (
+                <ActivityIndicator color={COLORS.text} />
+              ) : (
+                <Text style={styles.registerBtnText}>Trimite cererea</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
