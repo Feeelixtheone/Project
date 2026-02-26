@@ -228,22 +228,12 @@ export default function RestaurantDetailScreen() {
     }
   };
 
-  if (isLoading || !restaurant) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
-
-  const menuCategories = [...new Set(restaurant.menu.map((item: any) => item.category))];
+  const menuCategories = !restaurant ? [] : [...new Set(restaurant.menu.map((item: any) => item.category))];
 
   const cartItemCount = getItemCount();
 
-  // Add to cart toast
-  const [addedToCartMsg, setAddedToCartMsg] = useState('');
-
   const handleAddToCart = (menuItem: any) => {
+    if (!restaurant) return;
     addItem({
       menuItemId: menuItem.id,
       restaurantId: id!,
@@ -254,9 +244,16 @@ export default function RestaurantDetailScreen() {
       imageUrl: menuItem.image_url || 'https://via.placeholder.com/80',
     });
     setAddedToCartMsg(menuItem.name);
-    // Auto-dismiss after 3 seconds
     setTimeout(() => setAddedToCartMsg(''), 3000);
   };
+
+  if (isLoading || !restaurant) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const renderMenuItem = ({ item }: { item: any }) => {
     const cartItems = getRestaurantItems(id!);
