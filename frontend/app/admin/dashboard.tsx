@@ -29,6 +29,9 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [companies, setCompanies] = useState<any[]>([]);
   const [pendingCompanies, setPendingCompanies] = useState<any[]>([]);
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [activeAdminTab, setActiveAdminTab] = useState<'overview' | 'companies' | 'restaurants' | 'notifications'>('overview');
   
   // Modals
   const [showCreateCompany, setShowCreateCompany] = useState(false);
