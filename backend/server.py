@@ -3036,6 +3036,273 @@ async def get_support_info():
         "message": "Pentru asistență, contactați-ne la adresele de mai sus."
     }
 
+# ==================== FAVORITES ROUTES ====================
+
+@api_router.get("/favorites")
+async def get_favorites(user: User = Depends(require_auth)):
+    """Get user's favorite restaurants"""
+    favorites = await db.favorites.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Get restaurant details for each favorite
+    restaurant_ids = [f["restaurant_id"] for f in favorites]
+    restaurants = await db.restaurants.find(
+        {"id": {"$in": restaurant_ids}},
+        {"_id": 0}
+    ).to_list(100)
+    
+    restaurant_map = {r["id"]: r for r in restaurants}
+    result = []
+    for fav in favorites:
+        restaurant = restaurant_map.get(fav["restaurant_id"])
+        if restaurant:
+            result.append({
+                **fav,
+                "restaurant": restaurant
+            })
+    
+    return result
+
+@api_router.post("/favorites/{restaurant_id}")
+async def toggle_favorite(restaurant_id: str, user: User = Depends(require_auth)):
+    """Toggle favorite status for a restaurant"""
+    existing = await db.favorites.find_one(
+        {"user_id": user.user_id, "restaurant_id": restaurant_id}
+    )
+    
+    if existing:
+        await db.favorites.delete_one({"user_id": user.user_id, "restaurant_id": restaurant_id})
+        return {"is_favorite": False, "message": "Restaurantul a fost eliminat din favorite"}
+    else:
+        favorite = {
+            "id": str(uuid.uuid4()),
+            "user_id": user.user_id,
+            "restaurant_id": restaurant_id,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.favorites.insert_one(favorite)
+        return {"is_favorite": True, "message": "Restaurantul a fost adăugat la favorite"}
+
+@api_router.get("/favorites/check/{restaurant_id}")
+async def check_favorite(restaurant_id: str, user: User = Depends(require_auth)):
+    """Check if a restaurant is in user's favorites"""
+    existing = await db.favorites.find_one(
+        {"user_id": user.user_id, "restaurant_id": restaurant_id}
+    )
+    return {"is_favorite": existing is not None}
+
+# ==================== POST-ORDER FEEDBACK ROUTES ====================
+
+class FeedbackCreate(BaseModel):
+    order_id: Optional[str] = None
+    reservation_id: Optional[str] = None
+    restaurant_id: str
+    rating: int = Field(..., ge=1, le=5)
+    food_rating: Optional[int] = Field(None, ge=1, le=5)
+    service_rating: Optional[int] = Field(None, ge=1, le=5)
+    ambiance_rating: Optional[int] = Field(None, ge=1, le=5)
+    comment: str = ""
+    would_recommend: bool = True
+
+@api_router.post("/feedback")
+async def create_feedback(data: FeedbackCreate, user: User = Depends(require_auth)):
+    """Submit post-order/reservation feedback"""
+    # Check if feedback already exists for this order/reservation
+    query = {"user_id": user.user_id, "restaurant_id": data.restaurant_id}
+    if data.order_id:
+        query["order_id"] = data.order_id
+    elif data.reservation_id:
+        query["reservation_id"] = data.reservation_id
+    
+    existing = await db.feedback.find_one(query)
+    if existing:
+        raise HTTPException(status_code=400, detail="Ai trimis deja feedback pentru această comandă")
+    
+    restaurant = await db.restaurants.find_one({"id": data.restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurantul nu a fost găsit")
+    
+    feedback = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "user_name": user.name,
+        "order_id": data.order_id,
+        "reservation_id": data.reservation_id,
+        "restaurant_id": data.restaurant_id,
+        "restaurant_name": restaurant["name"],
+        "rating": data.rating,
+        "food_rating": data.food_rating,
+        "service_rating": data.service_rating,
+        "ambiance_rating": data.ambiance_rating,
+        "comment": data.comment,
+        "would_recommend": data.would_recommend,
+        "created_at": datetime.now(timezone.utc)
+    }
+    
+    await db.feedback.insert_one(feedback)
+    
+    # Update restaurant average rating
+    all_feedback = await db.feedback.find(
+        {"restaurant_id": data.restaurant_id},
+        {"_id": 0, "rating": 1}
+    ).to_list(1000)
+    if all_feedback:
+        avg_rating = round(sum(f["rating"] for f in all_feedback) / len(all_feedback), 1)
+        await db.restaurants.update_one(
+            {"id": data.restaurant_id},
+            {"$set": {"rating": avg_rating, "review_count": len(all_feedback)}}
+        )
+    
+    # Notify restaurant of new feedback
+    await create_restaurant_notification(
+        restaurant_id=data.restaurant_id,
+        notification_type="new_feedback",
+        title="Feedback nou primit",
+        message=f"{user.name} a lăsat un feedback de {data.rating}/5 stele.",
+        data={"feedback_id": feedback["id"], "rating": data.rating}
+    )
+    
+    return {"message": "Feedback trimis cu succes!", "feedback_id": feedback["id"]}
+
+@api_router.get("/feedback/pending")
+async def get_pending_feedback(user: User = Depends(require_auth)):
+    """Get orders/reservations that don't have feedback yet"""
+    # Get completed orders without feedback
+    orders = await db.orders.find(
+        {"user_id": user.user_id, "status": {"$in": ["confirmed", "completed"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    
+    reservations = await db.reservations.find(
+        {"user_id": user.user_id, "status": {"$in": ["confirmed", "completed"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    
+    # Filter out those that already have feedback
+    order_ids = [o["id"] for o in orders]
+    reservation_ids = [r["id"] for r in reservations]
+    
+    existing_order_feedback = await db.feedback.find(
+        {"order_id": {"$in": order_ids}},
+        {"_id": 0, "order_id": 1}
+    ).to_list(100)
+    existing_res_feedback = await db.feedback.find(
+        {"reservation_id": {"$in": reservation_ids}},
+        {"_id": 0, "reservation_id": 1}
+    ).to_list(100)
+    
+    feedback_order_ids = {f["order_id"] for f in existing_order_feedback}
+    feedback_res_ids = {f["reservation_id"] for f in existing_res_feedback}
+    
+    pending_orders = [o for o in orders if o["id"] not in feedback_order_ids]
+    pending_reservations = [r for r in reservations if r["id"] not in feedback_res_ids]
+    
+    return {"orders": pending_orders, "reservations": pending_reservations}
+
+@api_router.get("/feedback/restaurant/{restaurant_id}")
+async def get_restaurant_feedback(restaurant_id: str):
+    """Get feedback for a specific restaurant"""
+    feedback = await db.feedback.find(
+        {"restaurant_id": restaurant_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return feedback
+
+# ==================== SPECIAL OFFERS ROUTES ====================
+
+class SpecialOfferCreate(BaseModel):
+    restaurant_id: str
+    title: str
+    description: str
+    discount_percentage: Optional[float] = None
+    valid_until: Optional[str] = None
+
+@api_router.post("/offers")
+async def create_special_offer(data: SpecialOfferCreate, user: User = Depends(require_auth)):
+    """Create a special offer for a restaurant (company owner only)"""
+    company = await db.companies.find_one({"owner_id": user.user_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=403, detail="Nu ai o firmă")
+    
+    store = await db.company_stores.find_one({"id": data.restaurant_id, "company_id": company["id"]})
+    if not store:
+        raise HTTPException(status_code=404, detail="Restaurantul nu a fost găsit")
+    
+    offer = {
+        "id": str(uuid.uuid4()),
+        "restaurant_id": data.restaurant_id,
+        "restaurant_name": store.get("name", ""),
+        "company_id": company["id"],
+        "title": data.title,
+        "description": data.description,
+        "discount_percentage": data.discount_percentage,
+        "valid_until": data.valid_until,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc)
+    }
+    
+    await db.special_offers.insert_one(offer)
+    
+    # Notify all users who favorited this restaurant
+    favorites = await db.favorites.find(
+        {"restaurant_id": data.restaurant_id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    for fav in favorites:
+        notification = {
+            "id": str(uuid.uuid4()),
+            "user_id": fav["user_id"],
+            "type": "special_offer",
+            "title": f"Ofertă specială la {store.get('name', '')}!",
+            "message": data.title,
+            "restaurant_id": data.restaurant_id,
+            "offer_id": offer["id"],
+            "is_read": False,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.user_notifications.insert_one(notification)
+    
+    return {"message": f"Oferta a fost creată! {len(favorites)} utilizatori vor fi notificați.", "offer_id": offer["id"]}
+
+@api_router.get("/offers/restaurant/{restaurant_id}")
+async def get_restaurant_offers(restaurant_id: str):
+    """Get active special offers for a restaurant"""
+    offers = await db.special_offers.find(
+        {"restaurant_id": restaurant_id, "is_active": True},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    return offers
+
+@api_router.get("/offers/active")
+async def get_all_active_offers():
+    """Get all active special offers"""
+    offers = await db.special_offers.find(
+        {"is_active": True},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return offers
+
+@api_router.get("/user/notifications")
+async def get_user_notifications(user: User = Depends(require_auth)):
+    """Get user notifications (special offers, etc.)"""
+    notifications = await db.user_notifications.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return notifications
+
+@api_router.put("/user/notifications/read-all")
+async def mark_user_notifications_read(user: User = Depends(require_auth)):
+    """Mark all user notifications as read"""
+    await db.user_notifications.update_many(
+        {"user_id": user.user_id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "OK"}
+
 # ==================== BASIC ROUTES ====================
 
 @api_router.get("/")
