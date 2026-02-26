@@ -645,15 +645,15 @@ export default function RezervariScreen() {
                         <Text style={styles.priceValue}>{selectedRestaurant.upfront_fee || 20} RON</Text>
                       </View>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Comision (1.7%)</Text>
+                        <Text style={styles.priceLabel}>Comision (2.7%) - dedus din restaurant</Text>
                         <Text style={styles.priceValue}>
-                          {((selectedRestaurant.upfront_fee || 20) * 0.017).toFixed(2)} RON
+                          {((selectedRestaurant.upfront_fee || 20) * 0.027).toFixed(2)} RON
                         </Text>
                       </View>
                       <View style={[styles.priceRow, styles.priceTotal]}>
                         <Text style={styles.priceTotalLabel}>Total de plătit</Text>
                         <Text style={styles.priceTotalValue}>
-                          {((selectedRestaurant.upfront_fee || 20) * 1.017).toFixed(2)} RON
+                          {(selectedRestaurant.upfront_fee || 20).toFixed(2)} RON
                         </Text>
                       </View>
                       <Text style={styles.priceNote}>
@@ -667,15 +667,15 @@ export default function RezervariScreen() {
                         <Text style={styles.priceValue}>{calculateFoodTotal().toFixed(2)} RON</Text>
                       </View>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Comision (1.7%)</Text>
+                        <Text style={styles.priceLabel}>Comision (2.7%) - dedus din restaurant</Text>
                         <Text style={styles.priceValue}>
-                          {(calculateFoodTotal() * 0.017).toFixed(2)} RON
+                          {(calculateFoodTotal() * 0.027).toFixed(2)} RON
                         </Text>
                       </View>
                       <View style={[styles.priceRow, styles.priceTotal]}>
                         <Text style={styles.priceTotalLabel}>Total de plătit</Text>
                         <Text style={styles.priceTotalValue}>
-                          {(calculateFoodTotal() * 1.017).toFixed(2)} RON
+                          {calculateFoodTotal().toFixed(2)} RON
                         </Text>
                       </View>
                     </>
