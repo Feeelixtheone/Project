@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
-  Platform,
   ActivityIndicator,
   Linking,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,8 @@ export default function CartScreen() {
   const clearCart = useCartStore((s) => s.clearCart);
   const clearRestaurantItems = useCartStore((s) => s.clearRestaurantItems);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Group items by restaurant
   const groupedItems = useMemo(() => {
@@ -50,23 +52,20 @@ export default function CartScreen() {
   };
 
   const handleClearCart = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Vrei sa golesti tot cosul?')) {
-        clearCart();
-      }
-    } else {
-      Alert.alert('Goleste cosul', 'Vrei sa golesti tot cosul?', [
-        { text: 'Nu', style: 'cancel' },
-        { text: 'Da', style: 'destructive', onPress: () => clearCart() },
-      ]);
-    }
+    setShowConfirmClear(true);
   };
 
-  const handleCheckout = async (restaurantId: string, restaurantName: string) => {
+  const confirmClearCart = () => {
+    clearCart();
+    setShowConfirmClear(false);
+  };
+
+  const handleCheckout = async (restaurantId: string) => {
     const restaurantItems = items.filter((i) => i.restaurantId === restaurantId);
     if (restaurantItems.length === 0) return;
 
     setIsCheckingOut(restaurantId);
+    setErrorMessage('');
 
     try {
       const originUrl = BACKEND_URL || (typeof window !== 'undefined' ? window.location?.origin : '') || 'https://app.local';
@@ -85,13 +84,11 @@ export default function CartScreen() {
 
       const result = await createDirectOrder(orderData);
 
-      // Open Stripe checkout
       if (result.payment?.checkout_url) {
-        // Clear restaurant items from cart after successful order creation
         clearRestaurantItems(restaurantId);
-        
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.open(result.payment.checkout_url, '_blank');
+
+        if (typeof window !== 'undefined') {
+          window.location.href = result.payment.checkout_url;
         } else {
           const supported = await Linking.canOpenURL(result.payment.checkout_url);
           if (supported) {
@@ -100,12 +97,7 @@ export default function CartScreen() {
         }
       }
     } catch (error: any) {
-      const msg = error.message || 'Nu s-a putut crea comanda';
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Eroare', msg);
-      }
+      setErrorMessage(error.message || 'Nu s-a putut crea comanda');
     } finally {
       setIsCheckingOut(null);
     }
@@ -115,25 +107,36 @@ export default function CartScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]} data-testid="cart-screen">
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} data-testid="cart-back-btn">
+        <Pressable onPress={() => router.back()} style={styles.backBtn} data-testid="cart-back-btn">
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.title}>Cosul meu</Text>
         {items.length > 0 && (
-          <TouchableOpacity onPress={handleClearCart} data-testid="cart-clear-all-btn">
+          <Pressable onPress={handleClearCart} data-testid="cart-clear-all-btn" style={styles.trashBtn}>
             <Ionicons name="trash-outline" size={22} color={COLORS.error} />
-          </TouchableOpacity>
+            <Text style={styles.trashBtnText}>Goleste</Text>
+          </Pressable>
         )}
       </View>
+
+      {/* Error message */}
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Pressable onPress={() => setErrorMessage('')}>
+            <Ionicons name="close" size={18} color={COLORS.error} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {items.length === 0 ? (
         <View style={styles.emptyContainer} data-testid="cart-empty">
           <Ionicons name="cart-outline" size={80} color={COLORS.textMuted} />
           <Text style={styles.emptyText}>Cosul tau este gol</Text>
           <Text style={styles.emptySubtext}>Adauga produse din meniul restaurantelor</Text>
-          <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(tabs)/restaurante')} data-testid="cart-browse-btn">
+          <Pressable style={styles.browseBtn} onPress={() => router.push('/(tabs)/restaurante')} data-testid="cart-browse-btn">
             <Text style={styles.browseBtnText}>Vezi restaurante</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -149,13 +152,19 @@ export default function CartScreen() {
 
                 {group.items.map((item) => (
                   <View key={`${item.menuItemId}-${item.restaurantId}`} style={styles.cartItem} data-testid={`cart-item-${item.menuItemId}`}>
-                    <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+                    {item.imageUrl ? (
+                      <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+                    ) : (
+                      <View style={[styles.itemImage, { backgroundColor: COLORS.surfaceLight, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="fast-food" size={20} color={COLORS.textMuted} />
+                      </View>
+                    )}
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.itemPrice}>{item.price.toFixed(2)} RON</Text>
                     </View>
                     <View style={styles.quantityControls}>
-                      <TouchableOpacity
+                      <Pressable
                         style={styles.qtyBtn}
                         data-testid={`cart-item-decrease-${item.menuItemId}`}
                         onPress={() => {
@@ -167,24 +176,24 @@ export default function CartScreen() {
                         }}
                       >
                         <Ionicons name={item.quantity <= 1 ? "trash" : "remove"} size={14} color={item.quantity <= 1 ? COLORS.error : COLORS.text} />
-                      </TouchableOpacity>
+                      </Pressable>
                       <Text style={styles.qtyText}>{item.quantity}</Text>
-                      <TouchableOpacity
+                      <Pressable
                         style={styles.qtyBtn}
                         data-testid={`cart-item-increase-${item.menuItemId}`}
                         onPress={() => updateQuantity(item.menuItemId, item.restaurantId, item.quantity + 1)}
                       >
                         <Ionicons name="add" size={14} color={COLORS.text} />
-                      </TouchableOpacity>
+                      </Pressable>
                     </View>
                     <Text style={styles.itemTotal}>{(item.price * item.quantity).toFixed(2)}</Text>
-                    <TouchableOpacity
+                    <Pressable
                       onPress={() => handleRemoveItem(item.menuItemId, item.restaurantId)}
                       style={styles.removeBtn}
                       data-testid={`cart-item-remove-${item.menuItemId}`}
                     >
                       <Ionicons name="close-circle" size={22} color={COLORS.error} />
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
                 ))}
 
@@ -196,7 +205,6 @@ export default function CartScreen() {
                   </View>
                 </View>
 
-                {/* Info message */}
                 <View style={styles.infoBox}>
                   <Ionicons name="information-circle" size={18} color={COLORS.primary} />
                   <Text style={styles.infoText}>
@@ -204,9 +212,9 @@ export default function CartScreen() {
                   </Text>
                 </View>
 
-                <TouchableOpacity
+                <Pressable
                   style={[styles.checkoutBtn, isCheckingOut === group.restaurantId && styles.checkoutBtnDisabled]}
-                  onPress={() => handleCheckout(group.restaurantId, group.restaurantName)}
+                  onPress={() => handleCheckout(group.restaurantId)}
                   disabled={isCheckingOut === group.restaurantId}
                   data-testid={`cart-checkout-${group.restaurantId}`}
                 >
@@ -218,13 +226,32 @@ export default function CartScreen() {
                       <Text style={styles.checkoutBtnText}>Plateste {groupSubtotal.toFixed(2)} RON</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </Pressable>
               </View>
             );
           })}
           <View style={{ height: insets.bottom + 20 }} />
         </ScrollView>
       )}
+
+      {/* Confirm Clear Modal */}
+      <Modal visible={showConfirmClear} transparent animationType="fade" onRequestClose={() => setShowConfirmClear(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="trash" size={40} color={COLORS.error} />
+            <Text style={styles.modalTitle}>Goleste cosul?</Text>
+            <Text style={styles.modalMessage}>Toate produsele vor fi sterse din cos.</Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalBtnCancel} onPress={() => setShowConfirmClear(false)} data-testid="confirm-clear-no">
+                <Text style={styles.modalBtnCancelText}>Nu</Text>
+              </Pressable>
+              <Pressable style={styles.modalBtnConfirm} onPress={confirmClearCart} data-testid="confirm-clear-yes">
+                <Text style={styles.modalBtnConfirmText}>Da, goleste</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -240,6 +267,19 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontFamily: FONTS.bold, fontSize: 24, color: COLORS.text },
+  trashBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SPACING.sm, paddingVertical: 6, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.error + '15' },
+  trashBtnText: { fontFamily: FONTS.medium, fontSize: 13, color: COLORS.error },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.error + '20',
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  errorText: { fontFamily: FONTS.medium, fontSize: 14, color: COLORS.error, flex: 1 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
   emptyText: { fontFamily: FONTS.semiBold, fontSize: 20, color: COLORS.textMuted, marginTop: SPACING.lg },
   emptySubtext: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.textMuted, marginTop: SPACING.xs, textAlign: 'center' },
@@ -270,7 +310,7 @@ const styles = StyleSheet.create({
   qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.surfaceLight, justifyContent: 'center', alignItems: 'center' },
   qtyText: { fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.text, marginHorizontal: SPACING.sm },
   itemTotal: { fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.primary, minWidth: 50, textAlign: 'right' },
-  removeBtn: { marginLeft: SPACING.xs },
+  removeBtn: { marginLeft: SPACING.xs, padding: 4 },
   groupSummary: { marginTop: SPACING.md, paddingTop: SPACING.sm },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   totalRow: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.xs, paddingTop: SPACING.sm },
@@ -285,13 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.md,
   },
-  infoText: {
-    flex: 1,
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    color: COLORS.primary,
-    lineHeight: 18,
-  },
+  infoText: { flex: 1, fontFamily: FONTS.regular, fontSize: 13, color: COLORS.primary, lineHeight: 18 },
   checkoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -302,8 +336,16 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginTop: SPACING.md,
   },
-  checkoutBtnDisabled: {
-    opacity: 0.6,
-  },
+  checkoutBtnDisabled: { opacity: 0.6 },
   checkoutBtnText: { fontFamily: FONTS.semiBold, fontSize: 16, color: COLORS.text },
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
+  modalContent: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: '100%', maxWidth: 360 },
+  modalTitle: { fontFamily: FONTS.bold, fontSize: 20, color: COLORS.text, marginTop: SPACING.md },
+  modalMessage: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.textSecondary, marginTop: SPACING.sm, textAlign: 'center' },
+  modalButtons: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.xl, width: '100%' },
+  modalBtnCancel: { flex: 1, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  modalBtnCancelText: { fontFamily: FONTS.semiBold, fontSize: 16, color: COLORS.text },
+  modalBtnConfirm: { flex: 1, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.error, alignItems: 'center' },
+  modalBtnConfirmText: { fontFamily: FONTS.semiBold, fontSize: 16, color: '#fff' },
 });
