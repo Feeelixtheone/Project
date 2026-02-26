@@ -534,6 +534,35 @@ export default function CompanyDashboard() {
                 <View style={styles.storeInfo}>
                   <Text style={styles.storeName}>{store.name}</Text>
                   <Text style={styles.storeAddress}>{store.address}</Text>
+                  
+                  {/* Products list */}
+                  {store.menu && store.menu.length > 0 && (
+                    <View style={{ marginTop: SPACING.sm }}>
+                      <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.textSecondary, marginBottom: 4 }}>
+                        Produse ({store.menu.length}):
+                      </Text>
+                      {store.menu.slice(0, 5).map((item: any) => (
+                        <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 }}>
+                          <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: COLORS.text, flex: 1 }} numberOfLines={1}>
+                            {item.name} - {item.price} RON
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteProduct(store.id, item.id)}
+                            style={{ padding: 4 }}
+                            data-testid={`delete-product-${item.id}`}
+                          >
+                            <Ionicons name="trash-outline" size={16} color={COLORS.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {store.menu.length > 5 && (
+                        <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textMuted }}>
+                          +{store.menu.length - 5} alte produse
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
                   <View style={styles.storeActions}>
                     <TouchableOpacity
                       style={styles.storeAction}
