@@ -163,30 +163,28 @@ export default function CompanyDashboard() {
     }
   };
 
-  const handleUpload3DImage = async (storeId: string) => {
-    Alert.prompt(
-      'Adaugă imagine 3D',
-      'Introdu URL-ul imaginii 3D',
-      [
-        { text: 'Anulează', style: 'cancel' },
-        {
-          text: 'Adaugă',
-          onPress: async (url) => {
-            if (url) {
-              try {
-                await apiRequest(`/api/stores/${storeId}/images-3d?image_url=${encodeURIComponent(url)}`, {
-                  method: 'POST',
-                });
-                Alert.alert('Succes', 'Imaginea 3D a fost adăugată!');
-              } catch (error) {
-                Alert.alert('Eroare', 'Nu s-a putut adăuga imaginea');
-              }
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
+  const handleUpload3DImage = (storeId: string) => {
+    setSelectedStoreFor3D(storeId);
+    setImage3DUrl('');
+    setShow3DImageModal(true);
+  };
+
+  const handleSubmit3DImage = async () => {
+    if (!image3DUrl || !selectedStoreFor3D) {
+      Alert.alert('Eroare', 'Introdu URL-ul imaginii');
+      return;
+    }
+    try {
+      await apiRequest(`/api/stores/${selectedStoreFor3D}/images-3d?image_url=${encodeURIComponent(image3DUrl)}`, {
+        method: 'POST',
+      });
+      Alert.alert('Succes', 'Imaginea 3D a fost adăugată!');
+      setShow3DImageModal(false);
+      setImage3DUrl('');
+      setSelectedStoreFor3D('');
+    } catch (error) {
+      Alert.alert('Eroare', 'Nu s-a putut adăuga imaginea');
+    }
   };
 
   const resetStoreForm = () => {
