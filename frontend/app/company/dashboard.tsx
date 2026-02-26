@@ -299,7 +299,7 @@ export default function CompanyDashboard() {
             <Text style={styles.statLabel}>Restaurante</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>1.7%</Text>
+            <Text style={styles.statValue}>2.7%</Text>
             <Text style={styles.statLabel}>Comision</Text>
           </View>
         </View>
