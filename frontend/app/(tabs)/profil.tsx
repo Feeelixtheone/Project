@@ -317,7 +317,8 @@ export default function ProfilScreen() {
       ) : (
         <TouchableOpacity
           style={styles.registerCompanyBanner}
-          onPress={() => router.push('/')}
+          onPress={() => setShowRegisterModal(true)}
+          data-testid="register-company-btn"
         >
           <Ionicons name="business-outline" size={24} color={COLORS.primary} />
           <Text style={styles.registerCompanyText}>Înregistrează-te ca firmă</Text>
