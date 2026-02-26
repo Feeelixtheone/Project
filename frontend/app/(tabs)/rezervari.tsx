@@ -182,16 +182,13 @@ export default function RezervariScreen() {
       
       // Open Stripe checkout
       if (result.payment?.checkout_url) {
-        // For web, try to open in new tab
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.open(result.payment.checkout_url, '_blank');
+        // Redirect to Stripe checkout
+        if (typeof window !== 'undefined') {
+          window.location.href = result.payment.checkout_url;
         } else {
-          // For mobile, use Linking
           const supported = await Linking.canOpenURL(result.payment.checkout_url);
           if (supported) {
             await Linking.openURL(result.payment.checkout_url);
-          } else {
-            Alert.alert('Eroare', 'Nu se poate deschide pagina de plată.');
           }
         }
       }
