@@ -1896,6 +1896,18 @@ async def register_company(
         {"$set": {"is_company": True, "company_id": company.id}}
     )
     
+    # Create admin notification for verification
+    admin_notification = {
+        "id": str(uuid.uuid4()),
+        "type": "company_registration",
+        "title": "Cerere nouă de înregistrare firmă",
+        "message": f"Firma '{data.company_name}' (CUI: {data.cui}) solicită verificare. Email: {data.email}. ANAF verificat: {'Da' if anaf_data.get('valid') else 'Nu'}.",
+        "company_id": company.id,
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.admin_notifications.insert_one(admin_notification)
+    
     return {"message": "Firma a fost înregistrată. Așteaptă verificarea de către admin.", "company_id": company.id}
 
 @api_router.get("/companies/me")
