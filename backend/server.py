@@ -375,6 +375,36 @@ class RestaurantLike(BaseModel):
     restaurant_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Restaurant Notification Model
+class RestaurantNotification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str
+    notification_type: str  # new_reservation, order_update, payment_received
+    title: str
+    message: str
+    data: Optional[Dict] = None
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Receipt Model
+class Receipt(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    reservation_id: str
+    restaurant_id: str
+    restaurant_name: str
+    company_cui: str
+    company_name: str
+    user_id: str
+    user_name: str
+    user_email: str
+    items: List[dict]
+    subtotal: float
+    platform_commission: float
+    restaurant_payout: float
+    receipt_number: str  # Generated based on company CUI
+    issued_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = "issued"  # issued, paid, refunded
+
 # ==================== AUTH HELPERS ====================
 
 async def get_session_token(request: Request) -> Optional[str]:
