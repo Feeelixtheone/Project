@@ -370,13 +370,12 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 3
-  run_ui: false
+  test_sequence: 4
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "Company registration endpoint"
-    - "Company stores CRUD"
+    - "Manual testing of authenticated features with real Google OAuth"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -390,3 +389,5 @@ agent_communication:
     message: "🎉 STRIPE PAYMENT INTEGRATION TESTING COMPLETED SUCCESSFULLY! All 8 tests passed (8/8). Key findings: ✅ POST /api/payments/checkout/create working - creates Stripe sessions with 1.7% fee calculation ✅ GET /api/payments/checkout/status/{session_id} working - returns payment & session status ✅ POST /api/reservations/with-payment working - creates reservations with Stripe payment integration ✅ POST /api/webhook/stripe accessible for Stripe callbacks ✅ Authentication properly protects endpoints (401 for unauthorized) ✅ 1.7% platform fee calculated correctly in all payment flows. Stripe integration using sk_test_emergent test key is fully functional."
   - agent: "testing"
     message: "✅ ORDERS ENDPOINTS TESTING COMPLETED SUCCESSFULLY! All 4 tests passed (4/4). Key findings: ✅ POST /api/orders/create endpoint exists and properly requires JWT authentication (returns 401 without token) ✅ GET /api/orders/my endpoint exists and properly requires JWT authentication (returns 401 without token) ✅ Both endpoints are accessible and configured correctly ✅ App uses Emergent Auth with session exchange instead of traditional register/login endpoints (/auth/session and /auth/me exist). The direct order creation and user order retrieval endpoints are working as specified in the review request."
+  - agent: "testing"
+    message: "UI BUTTON CLICK TESTING STATUS: ✅ Welcome screen loads correctly (1/1 working). ✓ 'Continuă cu Google' button clickable and redirects to Emergent Auth OAuth. ⚠ AUTHENTICATION BLOCKER: Cannot complete automated testing of requested features (restaurant reservation modal, gallery fullscreen, cart clear, rezervări payment flow) without real Google OAuth credentials. All features are IMPLEMENTED with proper button handlers and UI flows, but require manual testing. Code review confirms: (1) Reservation button → modal → API call ✓, (2) Gallery images → fullscreen modal ✓, (3) Cart trash icon → clearCart() ✓, (4) Rezervări button → modal → Stripe payment ✓. App uses AsyncStorage + Emergent Auth session exchange. Attempted to create test session in MongoDB but auth validation requires proper OAuth flow. RECOMMENDATION: Manual testing with real Google account OR test credentials for automated OAuth."
