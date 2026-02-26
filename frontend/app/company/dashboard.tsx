@@ -625,6 +625,32 @@ export default function CompanyDashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* 3D Image Modal */}
+      <Modal visible={show3DImageModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Adaugă imagine 3D</Text>
+              <TouchableOpacity onPress={() => { setShow3DImageModal(false); setImage3DUrl(''); }}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.formLabel}>URL-ul imaginii 3D</Text>
+            <TextInput
+              style={styles.formInput}
+              value={image3DUrl}
+              onChangeText={setImage3DUrl}
+              placeholder="https://..."
+              placeholderTextColor={COLORS.textMuted}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit3DImage}>
+              <Text style={styles.submitButtonText}>Adaugă</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
