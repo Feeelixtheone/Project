@@ -267,6 +267,69 @@ frontend:
       - working: true
         agent: "main"
         comment: "Screenshot verified - logo, categories, company registration form with CUI validation"
+      - working: true
+        agent: "testing"
+        comment: "✓ TESTED: Welcome screen loads correctly at https://credit-card-issue.preview.emergentagent.com. All elements present: RestaurantApp logo, 'Continuă cu Google' button, 'Înregistrează-te ca firmă' button, food categories (Pizza, Aperitive, Sushi, Alcool, Exclusive), support email. Google login button is clickable and redirects to Emergent Auth OAuth page (auth.emergentagent.com). ✓ Backend API accessible (7 restaurants available)."
+
+  - task: "Google OAuth Login Flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/context/AuthContext.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "⚠ PARTIAL TEST: 'Continuă cu Google' button successfully redirects to Emergent Auth (auth.emergentagent.com) OAuth page. Cannot complete full OAuth flow in automated testing without real Google credentials. The auth flow uses: (1) External OAuth → (2) Redirect with session_id → (3) Exchange session_id for session_token via POST /api/auth/session → (4) Store token in AsyncStorage → (5) Validate via GET /api/auth/me. REQUIRES MANUAL TESTING: Full login flow completion, post-login navigation to /(tabs)/acasa, authenticated user state management."
+
+  - task: "Restaurant detail page with reservation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/restaurant/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "⚠ NOT TESTED: Requires authentication. Feature implemented: 'Rezervă o masă' button (line 586-593) opens reservation modal with date/time pickers, guest selector, special requests field. Modal has 'Confirmă rezervarea' button that calls handleReservation() → createReservationWithPayment() API. REQUIRES MANUAL TESTING with authenticated session."
+
+  - task: "Gallery image fullscreen in restaurant page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/restaurant/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "⚠ NOT TESTED: Requires authentication. Feature implemented: Gallery tab with 2D/3D/Video mode selector. Clicking gallery images (line 344-349) calls openFullscreenImage() which sets fullscreenImageUrl state and shows fullscreen modal (lines 854-873). Modal has expand icon overlay on images. REQUIRES MANUAL TESTING with authenticated session."
+
+  - task: "Cart page with clear all function"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/cart.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "⚠ NOT TESTED: Requires authentication. Feature implemented: Cart header has trash icon (line 98-107) that triggers Alert confirmation → clearCart() to remove all items from Zustand store. Cart displays grouped items by restaurant with quantity controls, price calculations, checkout button. REQUIRES MANUAL TESTING with authenticated session and items in cart."
+
+  - task: "Rezervări tab with new reservation and payment"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/rezervari.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "⚠ NOT TESTED: Requires authentication. Features implemented: (1) 'Rezervare nouă' button (line 408-413) opens modal, (2) Modal has restaurant selector, reservation type (table_only/food_ready), date/time pickers, guest selector, menu items selector for food_ready, (3) 'Continuă la plată' button (line 687-703) calls handleCreateReservation() → createReservationWithPayment() → opens Stripe checkout URL. Price summary shows upfront fee/food total + 1.7% platform fee. REQUIRES MANUAL TESTING with authenticated session."
 
   - task: "Food category filters on home"
     implemented: true
