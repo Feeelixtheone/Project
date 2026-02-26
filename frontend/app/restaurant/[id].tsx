@@ -66,6 +66,9 @@ export default function RestaurantDetailScreen() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
 
+  // Add to cart toast
+  const [addedToCartMsg, setAddedToCartMsg] = useState('');
+
   useEffect(() => {
     loadData();
     getLocation();
