@@ -497,6 +497,7 @@ export default function AdminDashboard() {
             </View>
           ))}
         </View>
+        )} {/* End of companies section */}
       </ScrollView>
 
       {/* Create Company Modal */}
