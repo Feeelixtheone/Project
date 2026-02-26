@@ -136,3 +136,81 @@ export const createDirectOrder = (data: {
 
 export const getMyOrders = () =>
   apiRequest<any[]>('/api/orders/my');
+
+
+// Company APIs
+export const registerCompany = (data: {
+  company_name: string;
+  cui: string;
+  email: string;
+  phone: string;
+}) => apiRequest<any>('/api/companies/register', { method: 'POST', body: data });
+
+export const getMyCompany = () =>
+  apiRequest<any>('/api/companies/me');
+
+export const getMyStores = () =>
+  apiRequest<any[]>('/api/stores/my');
+
+export const createStore = (data: any) =>
+  apiRequest<any>('/api/stores', { method: 'POST', body: data });
+
+export const addStoreProduct = (storeId: string, data: any) =>
+  apiRequest<any>(`/api/stores/${storeId}/products`, { method: 'POST', body: data });
+
+export const deleteStoreProduct = (storeId: string, productId: string) =>
+  apiRequest<any>(`/api/stores/${storeId}/products/${productId}`, { method: 'DELETE' });
+
+export const getStoreProducts = (storeId: string) =>
+  apiRequest<any[]>(`/api/stores/${storeId}/products`);
+
+export const getStoreOrders = (storeId: string) =>
+  apiRequest<any>(`/api/stores/${storeId}/orders`);
+
+// Notification APIs
+export const getCompanyNotifications = () =>
+  apiRequest<any[]>('/api/notifications/company');
+
+export const markNotificationRead = (notificationId: string) =>
+  apiRequest<any>(`/api/notifications/${notificationId}/read`, { method: 'PUT' });
+
+export const markAllNotificationsRead = () =>
+  apiRequest<any>('/api/notifications/mark-all-read', { method: 'PUT' });
+
+// Receipt APIs
+export const getCompanyReceipts = () =>
+  apiRequest<any[]>('/api/receipts/company');
+
+// Admin APIs
+export const getAdminStats = () =>
+  apiRequest<any>('/api/admin/stats');
+
+export const getAdminNotifications = () =>
+  apiRequest<any[]>('/api/admin/notifications');
+
+export const markAdminNotificationRead = (notificationId: string) =>
+  apiRequest<any>(`/api/admin/notifications/${notificationId}/read`, { method: 'PUT' });
+
+export const getAdminRestaurants = () =>
+  apiRequest<any[]>('/api/admin/restaurants');
+
+export const deleteAdminRestaurant = (restaurantId: string) =>
+  apiRequest<any>(`/api/admin/restaurants/${restaurantId}`, { method: 'DELETE' });
+
+export const deleteAdminProduct = (restaurantId: string, productId: string) =>
+  apiRequest<any>(`/api/admin/restaurants/${restaurantId}/products/${productId}`, { method: 'DELETE' });
+
+export const getAdminOrders = () =>
+  apiRequest<any[]>('/api/admin/orders');
+
+export const getAdminReservations = () =>
+  apiRequest<any[]>('/api/admin/reservations');
+
+export const verifyCompany = (companyId: string) =>
+  apiRequest<any>(`/api/companies/${companyId}/verify`, { method: 'PUT' });
+
+export const getAdminCompanies = () =>
+  apiRequest<any[]>('/api/admin/companies');
+
+export const getAdminUsers = () =>
+  apiRequest<any[]>('/api/admin/users');
