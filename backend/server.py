@@ -2176,6 +2176,15 @@ async def create_direct_order(
     }
     await db.orders.insert_one(order)
     
+    # Send notification to restaurant
+    await create_restaurant_notification(
+        restaurant_id=data.restaurant_id,
+        notification_type="new_order",
+        title="Comandă nouă",
+        message=f"Ai primit o comandă nouă de la {user.name}. Total: {total} RON.",
+        data={"order_id": order_id}
+    )
+    
     # Create Stripe checkout session
     host_url = str(request.base_url).rstrip('/')
     webhook_url = f"{host_url}/api/webhook/stripe"
