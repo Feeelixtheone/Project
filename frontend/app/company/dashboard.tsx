@@ -51,6 +51,11 @@ export default function CompanyDashboard() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [selectedStore, setSelectedStore] = useState<any>(null);
 
+  // 3D Image Modal
+  const [show3DImageModal, setShow3DImageModal] = useState(false);
+  const [image3DUrl, setImage3DUrl] = useState('');
+  const [selectedStoreFor3D, setSelectedStoreFor3D] = useState<string>('');
+
   // Store form
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
