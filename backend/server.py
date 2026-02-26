@@ -2099,10 +2099,11 @@ async def create_direct_order(
     if not data.items:
         raise HTTPException(status_code=400, detail="Coșul este gol")
     
-    # Calculate totals
+    # Calculate totals - user pays subtotal only, commission deducted from restaurant
     subtotal = sum(item.price * item.quantity for item in data.items)
     platform_fee = round(subtotal * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-    total = round(subtotal + platform_fee, 2)
+    restaurant_payout = round(subtotal - platform_fee, 2)
+    total = subtotal  # User pays only the subtotal, NO commission added
     
     # Create order record
     order_id = str(uuid.uuid4())
@@ -2116,6 +2117,7 @@ async def create_direct_order(
         "items": [item.dict() for item in data.items],
         "subtotal": subtotal,
         "platform_fee": platform_fee,
+        "restaurant_payout": restaurant_payout,
         "total": total,
         "status": "pending_payment",
         "created_at": datetime.now(timezone.utc)
