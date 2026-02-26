@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface CartItem {
   menuItemId: string;
@@ -27,78 +25,72 @@ interface CartState {
 }
 
 export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      items: [],
+  (set, get) => ({
+    items: [],
 
-      addItem: (item, quantity = 1) => {
-        set((state) => {
-          const existingIndex = state.items.findIndex(
-            (i) => i.menuItemId === item.menuItemId && i.restaurantId === item.restaurantId
-          );
-          if (existingIndex >= 0) {
-            const newItems = [...state.items];
-            newItems[existingIndex] = {
-              ...newItems[existingIndex],
-              quantity: newItems[existingIndex].quantity + quantity,
-            };
-            return { items: newItems };
-          }
-          return { items: [...state.items, { ...item, quantity }] };
-        });
-      },
-
-      removeItem: (menuItemId, restaurantId) => {
-        set((state) => ({
-          items: state.items.filter(
-            (i) => !(i.menuItemId === menuItemId && i.restaurantId === restaurantId)
-          ),
-        }));
-      },
-
-      updateQuantity: (menuItemId, restaurantId, quantity) => {
-        if (quantity <= 0) {
-          get().removeItem(menuItemId, restaurantId);
-          return;
+    addItem: (item, quantity = 1) => {
+      set((state) => {
+        const existingIndex = state.items.findIndex(
+          (i) => i.menuItemId === item.menuItemId && i.restaurantId === item.restaurantId
+        );
+        if (existingIndex >= 0) {
+          const newItems = [...state.items];
+          newItems[existingIndex] = {
+            ...newItems[existingIndex],
+            quantity: newItems[existingIndex].quantity + quantity,
+          };
+          return { items: newItems };
         }
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.menuItemId === menuItemId && i.restaurantId === restaurantId
-              ? { ...i, quantity }
-              : i
-          ),
-        }));
-      },
+        return { items: [...state.items, { ...item, quantity }] };
+      });
+    },
 
-      clearCart: () => set({ items: [] }),
+    removeItem: (menuItemId, restaurantId) => {
+      set((state) => ({
+        items: state.items.filter(
+          (i) => !(i.menuItemId === menuItemId && i.restaurantId === restaurantId)
+        ),
+      }));
+    },
 
-      clearRestaurantItems: (restaurantId) => {
-        set((state) => ({
-          items: state.items.filter((i) => i.restaurantId !== restaurantId),
-        }));
-      },
+    updateQuantity: (menuItemId, restaurantId, quantity) => {
+      if (quantity <= 0) {
+        get().removeItem(menuItemId, restaurantId);
+        return;
+      }
+      set((state) => ({
+        items: state.items.map((i) =>
+          i.menuItemId === menuItemId && i.restaurantId === restaurantId
+            ? { ...i, quantity }
+            : i
+        ),
+      }));
+    },
 
-      getItemCount: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
-      },
+    clearCart: () => set({ items: [] }),
 
-      getRestaurantItems: (restaurantId) => {
-        return get().items.filter((i) => i.restaurantId === restaurantId);
-      },
+    clearRestaurantItems: (restaurantId) => {
+      set((state) => ({
+        items: state.items.filter((i) => i.restaurantId !== restaurantId),
+      }));
+    },
 
-      getSubtotal: () => {
-        return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      },
+    getItemCount: () => {
+      return get().items.reduce((sum, item) => sum + item.quantity, 0);
+    },
 
-      getRestaurantSubtotal: (restaurantId) => {
-        return get()
-          .items.filter((i) => i.restaurantId === restaurantId)
-          .reduce((sum, item) => sum + item.price * item.quantity, 0);
-      },
-    }),
-    {
-      name: 'restaurant-cart-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    getRestaurantItems: (restaurantId) => {
+      return get().items.filter((i) => i.restaurantId === restaurantId);
+    },
+
+    getSubtotal: () => {
+      return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    },
+
+    getRestaurantSubtotal: (restaurantId) => {
+      return get()
+        .items.filter((i) => i.restaurantId === restaurantId)
+        .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    },
+  })
 );
