@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { updateUser, apiRequest, registerCompany } from '../../src/utils/api';
+import { updateUser, apiRequest, registerCompany, getFavorites, getPendingFeedback, submitFeedback, getUserNotifications, markUserNotificationsRead } from '../../src/utils/api';
 import { useCartStore } from '../../src/stores/cartStore';
 
 type TabType = 'profil' | 'plati' | 'setari';
@@ -43,8 +43,22 @@ export default function ProfilScreen() {
   const [regPhone, setRegPhone] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // Favorites, Feedback, Notifications
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [pendingFeedback, setPendingFeedback] = useState<any>({ orders: [], reservations: [] });
+  const [userNotifications, setUserNotifications] = useState<any[]>([]);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackTarget, setFeedbackTarget] = useState<any>(null);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackFoodRating, setFeedbackFoodRating] = useState(5);
+  const [feedbackServiceRating, setFeedbackServiceRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackRecommend, setFeedbackRecommend] = useState(true);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
   useEffect(() => {
     loadCompanyData();
+    loadExtras();
   }, [activeTab]);
 
   useEffect(() => {
