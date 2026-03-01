@@ -513,6 +513,54 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.md,
   },
+  // Dev Login Styles
+  devSection: {
+    marginTop: SPACING.lg,
+  },
+  devTitle: {
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  devAccounts: {
+    gap: SPACING.sm,
+  },
+  devAccountBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  devAdminBtn: {
+    backgroundColor: COLORS.gold,
+    borderColor: COLORS.gold,
+  },
+  devAccountName: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    color: '#0A0A0A',
+  },
+  devAccountEmail: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: 'rgba(0,0,0,0.6)',
+  },
+  devAccountNameLight: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+    color: COLORS.text,
+  },
+  devAccountEmailLight: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
   // Company Registration Styles
   formScrollContent: {
     padding: SPACING.lg,
