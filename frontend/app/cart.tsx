@@ -68,7 +68,8 @@ export default function CartScreen() {
     setErrorMessage('');
 
     try {
-      const originUrl = BACKEND_URL || (typeof window !== 'undefined' ? window.location?.origin : '') || 'https://app.local';
+      // Use the frontend URL for Stripe redirect URLs
+      const originUrl = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : BACKEND_URL || 'https://app.local';
 
       const orderData = {
         restaurant_id: restaurantId,
