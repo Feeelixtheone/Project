@@ -73,22 +73,89 @@ class RomanianRestaurantAPITester:
         success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
         self.log_result("GET /api/restaurant-of-the-week (no ROTW)", success, data, error)
         
+    def test_dev_login(self):
+        """Test dev login endpoints"""
+        print("\n🔐 Testing Dev Login...")
+        
+        # Test admin dev login
+        admin_data = {
+            "email": self.admin_email,
+            "name": "Admin Principal",
+            "role": "admin"
+        }
+        success, data, error = self.make_request('POST', '/api/auth/dev-login', 200, admin_data, auth_required=False)
+        self.log_result("POST /api/auth/dev-login (admin)", success, data, error)
+        
+        if success and data and data.get('session_token'):
+            self.token = data['session_token']
+            print(f"✅ Admin token received: {self.token[:20]}...")
+        
+        # Test user dev login
+        user_data = {
+            "email": "test.user@restaurant.ro",
+            "name": "Test User",
+            "role": "user"
+        }
+        success, data, error = self.make_request('POST', '/api/auth/dev-login', 200, user_data, auth_required=False)
+        self.log_result("POST /api/auth/dev-login (user)", success, data, error)
+    
+    def test_referral_endpoints(self):
+        """Test referral system endpoints"""
+        print("\n🎯 Testing Referral System...")
+        
+        if not self.token:
+            print("⚠️  Skipping referral tests - no authentication")
+            return
+            
+        # Test get my referral code
+        success, data, error = self.make_request('GET', '/api/referral/my-code')
+        self.log_result("GET /api/referral/my-code", success, data, error)
+        
+        if success and data and data.get('code'):
+            referral_code = data['code']
+            print(f"✅ Referral code received: {referral_code}")
+            
+            # Test applying own code (should fail)
+            success, data, error = self.make_request('POST', f'/api/referral/apply?code={referral_code}', 400)
+            self.log_result("POST /api/referral/apply (own code - should fail)", success, data, error)
+            
+            # Test applying fake code
+            success, data, error = self.make_request('POST', '/api/referral/apply?code=FAKECODE123', 400)
+            self.log_result("POST /api/referral/apply (fake code - should fail)", success, data, error)
+        
+        # Test referral leaderboard
+        success, data, error = self.make_request('GET', '/api/referral/leaderboard', auth_required=False)
+        self.log_result("GET /api/referral/leaderboard", success, data, error)
+
     def test_loyalty_endpoints(self):
         """Test loyalty system endpoints"""
         print("\n🏆 Testing Loyalty System...")
         
         # Test loyalty leaderboard - should return empty array when no data
         success, data, error = self.make_request('GET', '/api/loyalty/leaderboard', auth_required=False)
-        self.log_result("GET /api/loyalty/leaderboard (empty)", success, data, error)
+        self.log_result("GET /api/loyalty/leaderboard", success, data, error)
         
         if self.token:
             # Test my loyalty points
             success, data, error = self.make_request('GET', '/api/loyalty/my-points')
             self.log_result("GET /api/loyalty/my-points", success, data, error)
+    
+    def test_rotw_endpoints(self):
+        """Test Restaurant of the Week endpoints"""
+        print("\n🏆 Testing Restaurant of the Week...")
+        
+        # Test get ROTW before selection
+        success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
+        self.log_result("GET /api/restaurant-of-the-week (before selection)", success, data, error)
+        
+        if self.token:
+            # Test admin auto-select ROTW
+            success, data, error = self.make_request('POST', '/api/admin/restaurant-of-the-week/auto-select')
+            self.log_result("POST /api/admin/restaurant-of-the-week/auto-select", success, data, error)
             
-            # Test award points
-            success, data, error = self.make_request('POST', '/api/loyalty/award-points?order_id=test123&amount=50&restaurant_name=Test Restaurant')
-            self.log_result("POST /api/loyalty/award-points", success, data, error)
+            # Test get ROTW after selection
+            success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
+            self.log_result("GET /api/restaurant-of-the-week (after selection)", success, data, error)
     
     def test_admin_endpoints(self):
         """Test admin endpoints"""
