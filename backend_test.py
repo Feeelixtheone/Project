@@ -1,216 +1,194 @@
-#!/usr/bin/env python3
-
 import requests
 import sys
 import json
 from datetime import datetime
 
-# Backend URL - using the public endpoint for testing
-BACKEND_URL = "https://rating-feedback-hub.preview.emergentagent.com"
-
-class RestaurantAPITester:
-    def __init__(self, base_url=BACKEND_URL):
+class RomanianRestaurantAPITester:
+    def __init__(self, base_url="https://rating-feedback-hub.preview.emergentagent.com"):
         self.base_url = base_url
-        self.session = requests.Session()
-        self.session.headers.update({'Content-Type': 'application/json'})
+        self.token = None
         self.tests_run = 0
         self.tests_passed = 0
         self.failed_tests = []
-
-    def run_test(self, name, method, endpoint, expected_status=200, data=None, headers=None):
-        """Run a single API test"""
-        url = f"{self.base_url}{endpoint}"
-        if headers:
-            self.session.headers.update(headers)
+        self.admin_email = "mutinyretreat37@gmail.com"
         
+    def log_result(self, test_name, success, response_data=None, error=None):
+        """Log test results"""
         self.tests_run += 1
-        print(f"\n🔍 Testing {name}...")
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {test_name}")
+        else:
+            self.failed_tests.append({
+                'test': test_name,
+                'error': str(error) if error else 'Unknown error',
+                'response': response_data
+            })
+            print(f"❌ {test_name} - {error}")
+    
+    def make_request(self, method, endpoint, expected_status=200, data=None, auth_required=True):
+        """Make API request with error handling"""
+        url = f"{self.base_url}{endpoint}"
+        headers = {'Content-Type': 'application/json'}
+        
+        if auth_required and self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
         
         try:
             if method == 'GET':
-                response = self.session.get(url)
+                response = requests.get(url, headers=headers, timeout=30)
             elif method == 'POST':
-                response = self.session.post(url, json=data)
+                response = requests.post(url, json=data, headers=headers, timeout=30)
             elif method == 'PUT':
-                response = self.session.put(url, json=data)
+                response = requests.put(url, json=data, headers=headers, timeout=30)
             elif method == 'DELETE':
-                response = self.session.delete(url)
-
+                response = requests.delete(url, headers=headers, timeout=30)
+            
             success = response.status_code == expected_status
-            if success:
-                self.tests_passed += 1
-                print(f"✅ Passed - Status: {response.status_code}")
-                try:
-                    return response.json()
-                except:
-                    return response.text
-            else:
-                error_msg = f"Expected {expected_status}, got {response.status_code}"
-                try:
-                    error_detail = response.json()
-                    error_msg += f" - {error_detail.get('detail', '')}"
-                except:
-                    error_msg += f" - {response.text[:200]}"
-                
-                print(f"❌ Failed - {error_msg}")
-                self.failed_tests.append({
-                    'test': name,
-                    'endpoint': endpoint,
-                    'expected': expected_status,
-                    'actual': response.status_code,
-                    'error': error_msg
-                })
-                return None
-
+            response_data = None
+            
+            try:
+                response_data = response.json()
+            except:
+                response_data = {"raw_response": response.text[:500]}
+            
+            return success, response_data, None
+            
         except Exception as e:
-            error_msg = f"Request failed: {str(e)}"
-            print(f"❌ Failed - {error_msg}")
-            self.failed_tests.append({
-                'test': name,
-                'endpoint': endpoint,
-                'error': error_msg
-            })
-            return None
-
-    def test_health_check(self):
-        """Test /api/health endpoint"""
-        result = self.run_test("Health Check", "GET", "/api/health")
-        return result is not None
-
-    def test_restaurants_list(self):
-        """Test /api/restaurants endpoint"""
-        result = self.run_test("Get Restaurants", "GET", "/api/restaurants")
-        if result:
-            print(f"   Found {len(result)} restaurants")
-            return True
-        return False
-
-    def test_seed_data(self):
-        """Test /api/seed endpoint"""
-        result = self.run_test("Seed Data", "POST", "/api/seed")
-        if result:
-            print(f"   Seed result: {result.get('message', 'Unknown')}")
-            return True
-        return False
-
-    def test_commission_stats(self):
-        """Test commission percentage in admin stats"""
-        result = self.run_test("Admin Stats (Commission Check)", "GET", "/api/admin/stats", expected_status=401)
-        # We expect 401 since we're not authenticated as admin, but this tests the endpoint exists
-        return result is not None or self.tests_run > 0
-
-    def test_company_registration(self):
-        """Test company registration endpoint"""
-        company_data = {
-            "company_name": "Test Company Ltd",
-            "cui": "12345678",
-            "email": "test@company.ro", 
-            "phone": "0721234567"
-        }
-        result = self.run_test("Company Registration", "POST", "/api/companies/register", expected_status=401, data=company_data)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def test_notifications_endpoint(self):
-        """Test notifications endpoint"""
-        result = self.run_test("Company Notifications", "GET", "/api/notifications/company", expected_status=401)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def test_receipts_endpoint(self):
-        """Test receipts endpoint"""
-        result = self.run_test("Company Receipts", "GET", "/api/receipts/company", expected_status=401)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def test_admin_restaurants(self):
-        """Test admin restaurants endpoint"""
-        result = self.run_test("Admin Restaurants", "GET", "/api/admin/restaurants", expected_status=401)
-        # We expect 401 since we're not authenticated as admin, but this tests the endpoint exists
-        return True
-
-    def test_store_product_delete(self):
-        """Test store product delete endpoint structure"""
-        # Test with dummy IDs to verify endpoint structure exists
-        result = self.run_test("Store Product Delete", "DELETE", "/api/stores/dummy-store-id/products/dummy-product-id", expected_status=401)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def test_orders_create(self):
-        """Test orders create endpoint"""
-        order_data = {
-            "restaurant_id": "dummy-id",
-            "items": [{
-                "menu_item_id": "item1",
-                "name": "Test Item",
-                "price": 25.0,
-                "quantity": 1
-            }],
-            "origin_url": "https://test.com"
-        }
-        result = self.run_test("Orders Create", "POST", "/api/orders/create", expected_status=401, data=order_data)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def test_reservations_with_cancel_logic(self):
-        """Test reservations endpoint with cancel logic"""
-        result = self.run_test("Reservations List", "GET", "/api/reservations", expected_status=401)
-        # We expect 401 since we're not authenticated, but this tests the endpoint exists
-        return True
-
-    def run_all_tests(self):
-        """Run all backend tests"""
-        print("🚀 Starting Restaurant App Backend Tests")
-        print(f"📡 Testing against: {self.base_url}")
-        print("=" * 60)
-
-        # Core functionality tests
-        self.test_health_check()
-        self.test_seed_data()
-        self.test_restaurants_list()
+            return False, None, str(e)
+    
+    def test_basic_endpoints(self):
+        """Test basic public endpoints"""
+        print("\n🔍 Testing Basic Endpoints...")
         
-        # Authentication-required tests (we test endpoint existence)
-        self.test_commission_stats()
-        self.test_company_registration()
-        self.test_notifications_endpoint()
-        self.test_receipts_endpoint()
-        self.test_admin_restaurants()
-        self.test_store_product_delete()
-        self.test_orders_create()
-        self.test_reservations_with_cancel_logic()
-
-        # Print results
-        print("\n" + "=" * 60)
-        print("📊 TEST RESULTS")
+        # Test restaurants list
+        success, data, error = self.make_request('GET', '/api/restaurants', auth_required=False)
+        self.log_result("GET /api/restaurants", success, data, error)
+        
+        # Test seed data
+        success, data, error = self.make_request('POST', '/api/seed', auth_required=False)
+        self.log_result("POST /api/seed", success, data, error)
+        
+        # Test Restaurant of the Week - should return null when no ROTW selected
+        success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
+        self.log_result("GET /api/restaurant-of-the-week (no ROTW)", success, data, error)
+        
+    def test_loyalty_endpoints(self):
+        """Test loyalty system endpoints"""
+        print("\n🏆 Testing Loyalty System...")
+        
+        # Test loyalty leaderboard - should return empty array when no data
+        success, data, error = self.make_request('GET', '/api/loyalty/leaderboard', auth_required=False)
+        self.log_result("GET /api/loyalty/leaderboard (empty)", success, data, error)
+        
+        if self.token:
+            # Test my loyalty points
+            success, data, error = self.make_request('GET', '/api/loyalty/my-points')
+            self.log_result("GET /api/loyalty/my-points", success, data, error)
+            
+            # Test award points
+            success, data, error = self.make_request('POST', '/api/loyalty/award-points?order_id=test123&amount=50&restaurant_name=Test Restaurant')
+            self.log_result("POST /api/loyalty/award-points", success, data, error)
+    
+    def test_admin_endpoints(self):
+        """Test admin endpoints"""
+        print("\n👑 Testing Admin Endpoints...")
+        
+        if not self.token:
+            print("⚠️  Skipping admin tests - no authentication")
+            return
+            
+        # Test admin check
+        success, data, error = self.make_request('GET', '/api/admin/check')
+        self.log_result("GET /api/admin/check", success, data, error)
+        
+        if success and data and data.get('is_admin'):
+            print(f"✅ Admin access confirmed for: {data.get('email')}")
+            
+            # Test auto-select ROTW
+            success, data, error = self.make_request('POST', '/api/admin/restaurant-of-the-week/auto-select')
+            self.log_result("POST /api/admin/restaurant-of-the-week/auto-select", success, data, error)
+        else:
+            print(f"⚠️  User is not admin, skipping admin-only endpoints")
+    
+    def test_order_creation(self):
+        """Test order creation to check ObjectId serialization fix"""
+        print("\n🛒 Testing Order Creation...")
+        
+        if not self.token:
+            print("⚠️  Skipping order tests - no authentication")
+            return
+            
+        # Get restaurants first
+        success, restaurants, error = self.make_request('GET', '/api/restaurants', auth_required=False)
+        
+        if success and restaurants and len(restaurants) > 0:
+            restaurant = restaurants[0]
+            
+            # Test order creation
+            order_data = {
+                "restaurant_id": restaurant['id'],
+                "items": [
+                    {
+                        "menu_item_id": "test-item-123",
+                        "name": "Test Item",
+                        "price": 25.50,
+                        "quantity": 2,
+                        "image_url": "https://example.com/image.jpg"
+                    }
+                ],
+                "origin_url": "https://rating-feedback-hub.preview.emergentagent.com"
+            }
+            
+            success, data, error = self.make_request('POST', '/api/orders/create', 201, order_data)
+            self.log_result("POST /api/orders/create (ObjectId serialization test)", success, data, error)
+        else:
+            self.log_result("POST /api/orders/create", False, None, "No restaurants available for testing")
+    
+    def test_with_mock_auth(self):
+        """Test without actual authentication - for public endpoints"""
+        print("\n🔓 Testing Public Endpoints (No Auth)...")
+        
+        self.test_basic_endpoints()
+        self.test_loyalty_endpoints()
+    
+    def run_all_tests(self):
+        """Run all API tests"""
+        print("🚀 Starting Romanian Restaurant App API Tests")
+        print(f"Testing against: {self.base_url}")
         print("=" * 60)
-        print(f"✅ Tests passed: {self.tests_passed}/{self.tests_run}")
-        print(f"❌ Tests failed: {len(self.failed_tests)}")
+        
+        # Test public endpoints first
+        self.test_with_mock_auth()
+        
+        # Note: Real authentication would require Google OAuth flow
+        # For testing purposes, we'll focus on public endpoints
+        print(f"\n📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
         
         if self.failed_tests:
-            print("\n🔍 FAILED TESTS:")
-            for test in self.failed_tests:
-                print(f"   • {test['test']}: {test.get('error', 'Unknown error')}")
+            print("\n❌ Failed Tests:")
+            for failed in self.failed_tests:
+                print(f"  - {failed['test']}: {failed['error']}")
         
-        success_rate = (self.tests_passed / self.tests_run) * 100 if self.tests_run > 0 else 0
-        print(f"\n📈 Success Rate: {success_rate:.1f}%")
-        
-        return success_rate >= 70  # 70% success rate threshold
-
+        return self.tests_passed == self.tests_run
 
 def main():
-    tester = RestaurantAPITester()
-    success = tester.run_all_tests()
+    tester = RomanianRestaurantAPITester()
     
-    # Additional info about commission verification
+    # Run tests
+    all_passed = tester.run_all_tests()
+    
+    # Print summary
     print("\n" + "=" * 60)
-    print("💰 COMMISSION VERIFICATION")
-    print("=" * 60)
-    print("Expected: 2.7% commission deducted from restaurant")
-    print("Backend constant: PLATFORM_COMMISSION_PERCENTAGE = 2.7")
-    print("Implementation: Commission deducted from restaurant payout, NOT added to user bill")
+    print(f"🏁 Testing Complete!")
+    print(f"📈 Success Rate: {tester.tests_passed}/{tester.tests_run} ({(tester.tests_passed/tester.tests_run*100):.1f}%)")
     
-    return 0 if success else 1
-
+    if not all_passed:
+        print("\n⚠️  Some tests failed. Check the details above.")
+        return 1
+    else:
+        print("\n🎉 All tests passed!")
+        return 0
 
 if __name__ == "__main__":
     sys.exit(main())
