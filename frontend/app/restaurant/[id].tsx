@@ -90,14 +90,19 @@ export default function RestaurantDetailScreen() {
       
       // Load extra data in parallel
       try {
-        const [likedResult, offersResult, feedbackResult] = await Promise.all([
+        const [likedResult, offersResult, feedbackResult, rotwResult] = await Promise.all([
           checkFavorite(id!).catch(() => ({ is_favorite: false })),
           getRestaurantOffers(id!).catch(() => []),
           getRestaurantFeedback(id!).catch(() => []),
+          getRestaurantOfTheWeek().catch(() => null),
         ]);
         setIsLiked(likedResult.is_favorite);
         setSpecialOffers(offersResult);
         setFeedbackList(feedbackResult);
+        if (rotwResult && rotwResult.restaurant_id === id) {
+          setIsROTW(true);
+          setRotwDiscount(rotwResult.discount_percentage || 10);
+        }
       } catch (e) {}
     } catch (error) {
       console.error('Error loading restaurant:', error);
