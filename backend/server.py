@@ -3303,6 +3303,296 @@ async def mark_user_notifications_read(user: User = Depends(require_auth)):
     )
     return {"message": "OK"}
 
+# ==================== RESTAURANT OF THE WEEK ====================
+
+@api_router.get("/restaurant-of-the-week")
+async def get_restaurant_of_the_week():
+    """Get the current Restaurant of the Week"""
+    rotw = await db.restaurant_of_the_week.find_one(
+        {"is_active": True},
+        {"_id": 0}
+    )
+    if rotw:
+        restaurant = await db.restaurants.find_one({"id": rotw["restaurant_id"]}, {"_id": 0})
+        if restaurant:
+            return {**rotw, "restaurant": restaurant}
+    return None
+
+@api_router.post("/admin/restaurant-of-the-week/auto-select")
+async def auto_select_restaurant_of_the_week(user: User = Depends(require_admin)):
+    """Auto-select Restaurant of the Week based on rating + orders weighted score"""
+    restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(1000)
+    if not restaurants:
+        raise HTTPException(status_code=404, detail="Nu sunt restaurante disponibile")
+    
+    # Get order counts per restaurant (last 30 days)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    order_counts = {}
+    orders = await db.orders.find(
+        {"created_at": {"$gte": thirty_days_ago}, "status": {"$in": ["confirmed", "completed"]}},
+        {"_id": 0, "restaurant_id": 1}
+    ).to_list(10000)
+    for o in orders:
+        rid = o.get("restaurant_id", "")
+        order_counts[rid] = order_counts.get(rid, 0) + 1
+    
+    reservations = await db.reservations.find(
+        {"created_at": {"$gte": thirty_days_ago}, "status": {"$in": ["confirmed", "completed"]}},
+        {"_id": 0, "restaurant_id": 1}
+    ).to_list(10000)
+    for r in reservations:
+        rid = r.get("restaurant_id", "")
+        order_counts[rid] = order_counts.get(rid, 0) + 1
+    
+    max_orders = max(order_counts.values()) if order_counts else 1
+    max_rating = max(r.get("rating", 0) for r in restaurants) or 1
+    
+    # Exclude current ROTW
+    current = await db.restaurant_of_the_week.find_one({"is_active": True}, {"_id": 0})
+    current_id = current["restaurant_id"] if current else None
+    
+    # Calculate weighted score: 60% rating + 40% orders
+    scored = []
+    for r in restaurants:
+        if r["id"] == current_id:
+            continue
+        rating_norm = (r.get("rating", 0) / max_rating) if max_rating > 0 else 0
+        orders_norm = (order_counts.get(r["id"], 0) / max_orders) if max_orders > 0 else 0
+        score = 0.6 * rating_norm + 0.4 * orders_norm
+        scored.append((r, score))
+    
+    if not scored:
+        scored = [(restaurants[0], 1.0)]
+    
+    scored.sort(key=lambda x: -x[1])
+    winner = scored[0][0]
+    
+    # Deactivate previous
+    await db.restaurant_of_the_week.update_many({}, {"$set": {"is_active": False}})
+    
+    rotw = {
+        "id": str(uuid.uuid4()),
+        "restaurant_id": winner["id"],
+        "restaurant_name": winner["name"],
+        "discount_percentage": 10.0,
+        "reason": f"Rating: {winner.get('rating', 0)}, Comenzi: {order_counts.get(winner['id'], 0)}",
+        "selected_by": "auto",
+        "week_start": datetime.now(timezone.utc).isoformat(),
+        "week_end": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.restaurant_of_the_week.insert_one(rotw)
+    
+    return {
+        "message": f"Restaurantul Săptămânii: {winner['name']}",
+        "rotw": {k: v for k, v in rotw.items() if k != "_id"}
+    }
+
+@api_router.post("/admin/restaurant-of-the-week/manual")
+async def manual_select_restaurant_of_the_week(
+    restaurant_id: str,
+    user: User = Depends(require_admin)
+):
+    """Admin manually selects Restaurant of the Week"""
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant negăsit")
+    
+    await db.restaurant_of_the_week.update_many({}, {"$set": {"is_active": False}})
+    
+    rotw = {
+        "id": str(uuid.uuid4()),
+        "restaurant_id": restaurant_id,
+        "restaurant_name": restaurant["name"],
+        "discount_percentage": 10.0,
+        "reason": "Selectat manual de admin",
+        "selected_by": "admin",
+        "week_start": datetime.now(timezone.utc).isoformat(),
+        "week_end": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.restaurant_of_the_week.insert_one(rotw)
+    
+    # Notify all users
+    users = await db.users.find({}, {"_id": 0, "user_id": 1}).to_list(10000)
+    for u in users:
+        notif = {
+            "id": str(uuid.uuid4()),
+            "user_id": u["user_id"],
+            "type": "restaurant_of_the_week",
+            "title": f"Restaurantul Săptămânii: {restaurant['name']}!",
+            "message": "Bucură-te de 10% reducere la toate produsele!",
+            "restaurant_id": restaurant_id,
+            "is_read": False,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.user_notifications.insert_one(notif)
+    
+    return {
+        "message": f"Restaurantul Săptămânii: {restaurant['name']}",
+        "rotw": {k: v for k, v in rotw.items() if k != "_id"}
+    }
+
+# ==================== LOYALTY POINTS SYSTEM ====================
+
+POINTS_PER_RON = 1  # 1 point per RON spent
+
+@api_router.get("/loyalty/my-points")
+async def get_my_loyalty_points(user: User = Depends(require_auth)):
+    """Get user's loyalty points balance and history"""
+    points_doc = await db.loyalty_points.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    )
+    if not points_doc:
+        points_doc = {
+            "user_id": user.user_id,
+            "total_points": 0,
+            "lifetime_points": 0,
+            "level": "Bronze",
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.loyalty_points.insert_one(points_doc)
+        points_doc.pop("_id", None)
+    
+    # Get recent history
+    history = await db.loyalty_history.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    # Calculate level
+    lifetime = points_doc.get("lifetime_points", 0)
+    if lifetime >= 5000:
+        level = "Platinum"
+    elif lifetime >= 2000:
+        level = "Gold"
+    elif lifetime >= 500:
+        level = "Silver"
+    else:
+        level = "Bronze"
+    
+    return {
+        "total_points": points_doc.get("total_points", 0),
+        "lifetime_points": lifetime,
+        "level": level,
+        "history": history
+    }
+
+@api_router.post("/loyalty/award-points")
+async def award_loyalty_points(
+    order_id: str,
+    amount: float,
+    restaurant_name: str = "",
+    user: User = Depends(require_auth)
+):
+    """Award loyalty points after a completed order"""
+    # Check if points already awarded for this order
+    existing = await db.loyalty_history.find_one({"order_id": order_id, "user_id": user.user_id})
+    if existing:
+        return {"message": "Punctele au fost deja acordate pentru această comandă", "already_awarded": True}
+    
+    points = int(amount * POINTS_PER_RON)
+    if points <= 0:
+        return {"message": "Nu sunt puncte de acordat", "points": 0}
+    
+    # Update or create user points
+    result = await db.loyalty_points.update_one(
+        {"user_id": user.user_id},
+        {
+            "$inc": {"total_points": points, "lifetime_points": points},
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc)}
+        },
+        upsert=True
+    )
+    
+    # Log history
+    history_entry = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "order_id": order_id,
+        "points": points,
+        "amount_spent": amount,
+        "restaurant_name": restaurant_name,
+        "type": "earned",
+        "description": f"+{points} puncte pentru comandă de {amount} RON la {restaurant_name}",
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.loyalty_history.insert_one(history_entry)
+    
+    return {
+        "message": f"Ai primit {points} puncte de loialitate!",
+        "points_awarded": points,
+        "already_awarded": False
+    }
+
+@api_router.get("/loyalty/leaderboard")
+async def get_loyalty_leaderboard():
+    """Get top users leaderboard"""
+    top_users = await db.loyalty_points.find(
+        {},
+        {"_id": 0}
+    ).sort("lifetime_points", -1).to_list(20)
+    
+    leaderboard = []
+    for i, entry in enumerate(top_users):
+        user_doc = await db.users.find_one(
+            {"user_id": entry["user_id"]},
+            {"_id": 0, "name": 1, "picture": 1, "user_id": 1}
+        )
+        if user_doc:
+            lifetime = entry.get("lifetime_points", 0)
+            if lifetime >= 5000:
+                level = "Platinum"
+            elif lifetime >= 2000:
+                level = "Gold"
+            elif lifetime >= 500:
+                level = "Silver"
+            else:
+                level = "Bronze"
+            
+            leaderboard.append({
+                "rank": i + 1,
+                "user_id": entry["user_id"],
+                "name": user_doc.get("name", "Anonim"),
+                "picture": user_doc.get("picture"),
+                "total_points": entry.get("total_points", 0),
+                "lifetime_points": lifetime,
+                "level": level
+            })
+    
+    return leaderboard
+
+# ==================== PUSH NOTIFICATION TOKENS ====================
+
+@api_router.post("/push-tokens/register")
+async def register_push_token(
+    token: str,
+    user: User = Depends(require_auth)
+):
+    """Register an Expo push notification token"""
+    await db.push_tokens.update_one(
+        {"user_id": user.user_id},
+        {
+            "$set": {
+                "user_id": user.user_id,
+                "token": token,
+                "updated_at": datetime.now(timezone.utc)
+            },
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc)}
+        },
+        upsert=True
+    )
+    return {"message": "Token înregistrat"}
+
+@api_router.delete("/push-tokens")
+async def remove_push_token(user: User = Depends(require_auth)):
+    """Remove push token"""
+    await db.push_tokens.delete_one({"user_id": user.user_id})
+    return {"message": "Token eliminat"}
+
 # ==================== BASIC ROUTES ====================
 
 @api_router.get("/")
