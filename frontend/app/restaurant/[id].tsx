@@ -480,6 +480,12 @@ export default function RestaurantDetailScreen() {
         {/* Restaurant Info */}
         <View style={styles.restaurantInfo}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
+          {isROTW && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, backgroundColor: COLORS.gold + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: BORDER_RADIUS.sm, alignSelf: 'flex-start' }} data-testid="rotw-detail-badge">
+              <Ionicons name="trophy" size={14} color={COLORS.gold} />
+              <Text style={{ fontFamily: FONTS.bold, fontSize: 12, color: COLORS.gold }}>RESTAURANTUL SAPTAMANII  -{rotwDiscount}%</Text>
+            </View>
+          )}
           <View style={styles.restaurantMeta}>
             <View style={styles.metaItem}>
               <Ionicons name="star" size={16} color={COLORS.gold} />
