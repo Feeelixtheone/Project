@@ -276,32 +276,31 @@ export default function LoyaltyScreen() {
             <View style={styles.referralCard} data-testid="referral-card">
               <View style={styles.referralIconRow}>
                 <View style={styles.referralIconCircle}>
-                  <Ionicons name="gift" size={32} color={COLORS.primary} />
+                  <Ionicons name="gift" size={28} color="#fff" />
                 </View>
               </View>
               <Text style={styles.referralTitle}>Invita prieteni, castiga puncte!</Text>
               <Text style={styles.referralSubtitle}>
-                Primesti <Text style={{ color: COLORS.gold, fontFamily: FONTS.bold }}>{referralData?.referral_bonus || 50}</Text> puncte cand prietenul plaseaza prima comanda.
-                Prietenul primeste <Text style={{ color: COLORS.gold, fontFamily: FONTS.bold }}>{referralData?.welcome_bonus || 25}</Text> puncte la inscriere!
+                Primesti{' '}<Text style={styles.referralHighlight}>{referralData?.referral_bonus || 50} puncte</Text>{' '}
+                cand prietenul plaseaza prima comanda.{'\n'}
+                Prietenul primeste{' '}<Text style={styles.referralHighlight}>{referralData?.welcome_bonus || 25} puncte</Text>{' '}la inscriere!
               </Text>
               
               {/* Code display */}
               <View style={styles.codeBox}>
-                <Text style={styles.codeLabel}>Codul tau de referral</Text>
-                <View style={styles.codeRow}>
-                  <Text style={styles.codeValue} data-testid="referral-code">{referralData?.code || '...'}</Text>
+                <Text style={styles.codeLabel}>CODUL TAU DE REFERRAL</Text>
+                <Text style={styles.codeValue} data-testid="referral-code">{referralData?.code || '...'}</Text>
+                <View style={styles.codeActions}>
                   <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode} data-testid="referral-copy-btn">
-                    <Ionicons name={copied ? 'checkmark' : 'copy'} size={18} color={copied ? COLORS.success : COLORS.text} />
-                    <Text style={[styles.copyBtnText, copied && { color: COLORS.success }]}>{copied ? 'Copiat!' : 'Copiaza'}</Text>
+                    <Ionicons name={copied ? 'checkmark-circle' : 'copy-outline'} size={16} color={copied ? '#4ade80' : '#fff'} />
+                    <Text style={[styles.copyBtnText, copied && { color: '#4ade80' }]}>{copied ? 'Copiat!' : 'Copiaza codul'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.shareBtn} onPress={handleShareCode} data-testid="referral-share-btn">
+                    <Ionicons name="share-social-outline" size={16} color="#fff" />
+                    <Text style={styles.shareBtnText}>Trimite</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Share button */}
-              <TouchableOpacity style={styles.shareBtn} onPress={handleShareCode} data-testid="referral-share-btn">
-                <Ionicons name="share-social" size={20} color="#fff" />
-                <Text style={styles.shareBtnText}>Trimite prietenilor</Text>
-              </TouchableOpacity>
 
               {/* Stats */}
               <View style={styles.referralStats}>
@@ -319,19 +318,19 @@ export default function LoyaltyScreen() {
 
             {/* Apply Code */}
             <View style={styles.applySection}>
-              <Text style={styles.sectionTitle}>Ai un cod de referral?</Text>
+              <Text style={styles.applySectionTitle}>Ai un cod de referral?</Text>
               <View style={styles.applyRow}>
                 <TextInput
                   style={styles.applyInput}
                   value={referralCode}
                   onChangeText={setReferralCodeInput}
-                  placeholder="Introdu codul"
+                  placeholder="EX: AB12CD34"
                   placeholderTextColor={COLORS.textMuted}
                   autoCapitalize="characters"
                   data-testid="referral-apply-input"
                 />
                 <TouchableOpacity
-                  style={[styles.applyBtn, (!referralCode.trim() || applyingCode) && { opacity: 0.5 }]}
+                  style={[styles.applyBtn, (!referralCode.trim() || applyingCode) && styles.applyBtnDisabled]}
                   onPress={handleApplyCode}
                   disabled={!referralCode.trim() || applyingCode}
                   data-testid="referral-apply-btn"
@@ -339,7 +338,10 @@ export default function LoyaltyScreen() {
                   {applyingCode ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.applyBtnText}>Aplica</Text>
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                      <Text style={styles.applyBtnText}>Aplica</Text>
+                    </>
                   )}
                 </TouchableOpacity>
               </View>
