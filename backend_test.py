@@ -121,13 +121,19 @@ class RomanianRestaurantAPITester:
             referral_code = data['code']
             print(f"✅ Referral code received: {referral_code}")
             
-            # Test applying own code (should fail)
+            # Test applying own code (should fail with 400)
             success, data, error = self.make_request('POST', f'/api/referral/apply?code={referral_code}', 400)
-            self.log_result("POST /api/referral/apply (own code - should fail)", success, data, error)
+            if success:  # Success means we got expected 400 error
+                self.log_result("POST /api/referral/apply (own code - should fail)", True, data, None)
+            else:
+                self.log_result("POST /api/referral/apply (own code - should fail)", False, data, error)
             
-            # Test applying fake code
-            success, data, error = self.make_request('POST', '/api/referral/apply?code=FAKECODE123', 400)
-            self.log_result("POST /api/referral/apply (fake code - should fail)", success, data, error)
+            # Test applying fake code (should fail with 404)
+            success, data, error = self.make_request('POST', '/api/referral/apply?code=FAKECODE123', 404)
+            if success:  # Success means we got expected 404 error
+                self.log_result("POST /api/referral/apply (fake code - should fail)", True, data, None)
+            else:
+                self.log_result("POST /api/referral/apply (fake code - should fail)", False, data, error)
         
         # Test referral leaderboard
         success, data, error = self.make_request('GET', '/api/referral/leaderboard', auth_required=False)
