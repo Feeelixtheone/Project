@@ -2332,11 +2332,20 @@ async def create_direct_order(
     if not data.items:
         raise HTTPException(status_code=400, detail="Coșul este gol")
     
+    # Check if restaurant is Restaurant of the Week (10% discount)
+    rotw = await db.restaurant_of_the_week.find_one(
+        {"restaurant_id": data.restaurant_id, "is_active": True},
+        {"_id": 0}
+    )
+    rotw_discount = rotw["discount_percentage"] if rotw else 0.0
+    
     # Calculate totals - user pays subtotal only, commission deducted from restaurant
     subtotal = sum(item.price * item.quantity for item in data.items)
-    platform_fee = round(subtotal * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-    restaurant_payout = round(subtotal - platform_fee, 2)
-    total = subtotal  # User pays only the subtotal, NO commission added
+    discount_amount = round(subtotal * (rotw_discount / 100), 2) if rotw_discount > 0 else 0.0
+    subtotal_after_discount = round(subtotal - discount_amount, 2)
+    platform_fee = round(subtotal_after_discount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
+    restaurant_payout = round(subtotal_after_discount - platform_fee, 2)
+    total = subtotal_after_discount  # User pays discounted subtotal
     
     # Create order record
     order_id = str(uuid.uuid4())
