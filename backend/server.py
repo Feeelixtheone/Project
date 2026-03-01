@@ -3539,7 +3539,7 @@ async def award_loyalty_points(
         return {"message": "Nu sunt puncte de acordat", "points": 0}
     
     # Update or create user points
-    result = await db.loyalty_points.update_one(
+    await db.loyalty_points.update_one(
         {"user_id": user.user_id},
         {
             "$inc": {"total_points": points, "lifetime_points": points},
