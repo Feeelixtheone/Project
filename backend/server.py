@@ -2645,6 +2645,33 @@ async def stripe_webhook(request: Request):
                             message=f"Ai primit o comandă nouă plătită de la {user_email}.",
                             data={"order_id": order_id}
                         )
+                        # Award loyalty points
+                        total_amount = tx.get("amount", 0)
+                        points = int(total_amount * POINTS_PER_RON)
+                        if points > 0:
+                            user_id = metadata.get("user_id", "")
+                            existing_pts = await db.loyalty_history.find_one({"order_id": order_id, "user_id": user_id})
+                            if not existing_pts:
+                                await db.loyalty_points.update_one(
+                                    {"user_id": user_id},
+                                    {
+                                        "$inc": {"total_points": points, "lifetime_points": points},
+                                        "$setOnInsert": {"created_at": datetime.now(timezone.utc)}
+                                    },
+                                    upsert=True
+                                )
+                                await db.loyalty_history.insert_one({
+                                    "id": str(uuid.uuid4()),
+                                    "user_id": user_id,
+                                    "order_id": order_id,
+                                    "points": points,
+                                    "amount_spent": total_amount,
+                                    "restaurant_name": restaurant_name,
+                                    "type": "earned",
+                                    "description": f"+{points} puncte pentru comandă de {total_amount} RON la {restaurant_name}",
+                                    "created_at": datetime.now(timezone.utc)
+                                })
+                                logger.info(f"Loyalty points awarded: {points} to user {user_id}")
                     else:
                         reservation_id = metadata.get("reservation_id", "")
                         if reservation_id:
