@@ -105,7 +105,15 @@ export default function AcasaScreen() {
 
   useEffect(() => {
     loadRestaurants();
+    loadROTW();
   }, [sortBy, searchQuery, selectedCategory, exclusiveSubcategory]);
+
+  const loadROTW = async () => {
+    try {
+      const data = await getRestaurantOfTheWeek();
+      setRotwData(data);
+    } catch (e) {}
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
