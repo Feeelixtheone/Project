@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { apiRequest, getAdminNotifications, markAdminNotificationRead, getAdminRestaurants, deleteAdminRestaurant } from '../../src/utils/api';
+import { apiRequest, getAdminNotifications, markAdminNotificationRead, getAdminRestaurants, deleteAdminRestaurant, autoSelectROTW, manualSelectROTW, getRestaurantOfTheWeek } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function AdminDashboard() {
