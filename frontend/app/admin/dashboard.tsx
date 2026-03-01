@@ -134,8 +134,48 @@ export default function AdminDashboard() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
+    loadROTW();
     setRefreshing(false);
   }, []);
+
+  const loadROTW = async () => {
+    try {
+      const data = await getRestaurantOfTheWeek();
+      setRotwData(data);
+    } catch (e) {
+      setRotwData(null);
+    }
+  };
+
+  const handleAutoSelectROTW = async () => {
+    setRotwLoading(true);
+    try {
+      const result = await autoSelectROTW();
+      const msg = result.message || 'Restaurantul săptămânii a fost selectat!';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
+      loadROTW();
+    } catch (error: any) {
+      const msg = error.message || 'Eroare la selectare';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setRotwLoading(false);
+    }
+  };
+
+  const handleManualSelectROTW = async (restaurantId: string) => {
+    setRotwLoading(true);
+    try {
+      const result = await manualSelectROTW(restaurantId);
+      const msg = result.message || 'Restaurantul săptămânii a fost selectat!';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
+      loadROTW();
+    } catch (error: any) {
+      const msg = error.message || 'Eroare la selectare';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setRotwLoading(false);
+    }
+  };
 
   const handleVerifyCompany = async (companyId: string) => {
     try {
