@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 # Backend URL - using the public endpoint for testing
-BACKEND_URL = "https://reservation-payments.preview.emergentagent.com"
+BACKEND_URL = "https://rating-feedback-hub.preview.emergentagent.com"
 
 class RestaurantAPITester:
     def __init__(self, base_url=BACKEND_URL):
