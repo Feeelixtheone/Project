@@ -201,6 +201,24 @@ export default function WelcomeScreen() {
               </>
             )}
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.devAccountBtn, styles.devBusinessBtn]}
+            onPress={() => handleDevLogin('business@restaurant.ro', 'Business Owner', 'user')}
+            disabled={devLoginLoading !== null}
+            data-testid="dev-login-business"
+          >
+            {devLoginLoading === 'business@restaurant.ro' ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <>
+                <Ionicons name="business" size={18} color={COLORS.secondary} />
+                <View>
+                  <Text style={styles.devAccountNameLight}>Business Owner</Text>
+                  <Text style={styles.devAccountEmailLight}>business@restaurant.ro</Text>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
