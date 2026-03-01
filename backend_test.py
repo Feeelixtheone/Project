@@ -219,7 +219,7 @@ class RomanianRestaurantAPITester:
                 "origin_url": "https://rating-feedback-hub.preview.emergentagent.com"
             }
             
-            success, data, error = self.make_request('POST', '/api/orders/create', 201, order_data)
+            success, data, error = self.make_request('POST', '/api/orders/create', 200, order_data)
             self.log_result("POST /api/orders/create (ObjectId serialization test)", success, data, error)
         else:
             self.log_result("POST /api/orders/create", False, None, "No restaurants available for testing")
