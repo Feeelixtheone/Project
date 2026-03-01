@@ -52,6 +52,7 @@ export default function ProfilScreen() {
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackFoodRating, setFeedbackFoodRating] = useState(5);
   const [feedbackServiceRating, setFeedbackServiceRating] = useState(5);
+  const [feedbackAmbianceRating, setFeedbackAmbianceRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackRecommend, setFeedbackRecommend] = useState(true);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
