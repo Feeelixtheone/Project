@@ -2685,6 +2685,45 @@ async def stripe_webhook(request: Request):
                                     "created_at": datetime.now(timezone.utc)
                                 })
                                 logger.info(f"Loyalty points awarded: {points} to user {user_id}")
+                                
+                                # Check if this is the referred user's first order - award referral bonus
+                                try:
+                                    ref_entry = await db.referral_history.find_one({
+                                        "referred_id": user_id,
+                                        "referrer_bonus_awarded": False
+                                    })
+                                    if ref_entry:
+                                        referrer_id = ref_entry["referrer_id"]
+                                        await db.loyalty_points.update_one(
+                                            {"user_id": referrer_id},
+                                            {
+                                                "$inc": {"total_points": REFERRAL_BONUS_POINTS, "lifetime_points": REFERRAL_BONUS_POINTS},
+                                                "$setOnInsert": {"created_at": datetime.now(timezone.utc)}
+                                            },
+                                            upsert=True
+                                        )
+                                        await db.loyalty_history.insert_one({
+                                            "id": str(uuid.uuid4()),
+                                            "user_id": referrer_id,
+                                            "order_id": order_id,
+                                            "points": REFERRAL_BONUS_POINTS,
+                                            "amount_spent": 0,
+                                            "restaurant_name": "",
+                                            "type": "referral_bonus",
+                                            "description": f"+{REFERRAL_BONUS_POINTS} puncte bonus referral",
+                                            "created_at": datetime.now(timezone.utc)
+                                        })
+                                        await db.referral_history.update_one(
+                                            {"_id": ref_entry["_id"]},
+                                            {"$set": {"status": "completed", "referrer_bonus_awarded": True}}
+                                        )
+                                        await db.referrals.update_one(
+                                            {"user_id": referrer_id},
+                                            {"$inc": {"total_points_earned": REFERRAL_BONUS_POINTS}}
+                                        )
+                                        logger.info(f"Referral bonus {REFERRAL_BONUS_POINTS} pts awarded to {referrer_id}")
+                                except Exception as ref_err:
+                                    logger.error(f"Referral bonus error: {ref_err}")
                     else:
                         reservation_id = metadata.get("reservation_id", "")
                         if reservation_id:
