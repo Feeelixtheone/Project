@@ -50,7 +50,13 @@ class RomanianRestaurantAPITester:
             try:
                 response_data = response.json()
             except:
-                response_data = {"raw_response": response.text[:500]}
+                response_data = {"raw_response": response.text[:500], "status_code": response.status_code}
+            
+            if not success:
+                error_msg = f"Expected {expected_status}, got {response.status_code}"
+                if response_data and isinstance(response_data, dict) and 'detail' in response_data:
+                    error_msg += f" - {response_data['detail']}"
+                return success, response_data, error_msg
             
             return success, response_data, None
             
