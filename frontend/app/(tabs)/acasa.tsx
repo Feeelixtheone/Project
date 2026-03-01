@@ -258,8 +258,13 @@ export default function AcasaScreen() {
           <Text style={styles.subGreeting}>Ce ai poftă să mănânci azi?</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.cartHeaderBtn} onPress={() => router.push('/cart')}>
+          <TouchableOpacity style={styles.cartHeaderBtn} onPress={() => router.push('/cart')} data-testid="main-cart-btn">
             <Ionicons name="cart-outline" size={24} color={COLORS.text} />
+            {useCartStore.getState().getItemCount() > 0 && (
+              <View style={styles.cartHeaderBadge}>
+                <Text style={styles.cartHeaderBadgeText}>{useCartStore.getState().getItemCount()}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
             {user?.picture ? (
