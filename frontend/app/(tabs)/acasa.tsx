@@ -57,6 +57,7 @@ export default function AcasaScreen() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [exclusiveSubcategory, setExclusiveSubcategory] = useState('all_exclusive');
   const [showExclusiveSheet, setShowExclusiveSheet] = useState(false);
+  const [rotwData, setRotwData] = useState<any>(null);
 
   const loadRestaurants = async () => {
     try {
