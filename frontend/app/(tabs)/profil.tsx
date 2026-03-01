@@ -923,6 +923,17 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
   },
+  loyaltyQuickAccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.gold + '30',
+  },
   section: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
