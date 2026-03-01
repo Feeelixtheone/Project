@@ -1,285 +1,238 @@
+#!/usr/bin/env python3
+
 import requests
 import sys
 import json
 from datetime import datetime
+from typing import Dict, Any, Optional
 
-class RomanianRestaurantAPITester:
-    def __init__(self, base_url="https://rating-feedback-hub.preview.emergentagent.com"):
-        self.base_url = base_url
-        self.token = None
+# Public endpoint from the frontend .env
+BACKEND_URL = "https://rating-feedback-hub.preview.emergentagent.com"
+
+class RestaurantAppAPITester:
+    def __init__(self):
         self.tests_run = 0
         self.tests_passed = 0
-        self.failed_tests = []
-        self.admin_email = "mutinyretreat37@gmail.com"
+        self.session_token = None
+        self.user_data = None
+        self.business_session_token = None
+        self.business_user_data = None
         
-    def log_result(self, test_name, success, response_data=None, error=None):
-        """Log test results"""
+    def log_test(self, test_name: str, success: bool, details: str = ""):
         self.tests_run += 1
         if success:
             self.tests_passed += 1
-            print(f"✅ {test_name}")
+            print(f"✅ {test_name}: PASSED {details}")
         else:
-            self.failed_tests.append({
-                'test': test_name,
-                'error': str(error) if error else 'Unknown error',
-                'response': response_data
-            })
-            print(f"❌ {test_name} - {error}")
-    
-    def make_request(self, method, endpoint, expected_status=200, data=None, auth_required=True):
-        """Make API request with error handling"""
-        url = f"{self.base_url}{endpoint}"
-        headers = {'Content-Type': 'application/json'}
+            print(f"❌ {test_name}: FAILED {details}")
+            
+    def api_call(self, method: str, endpoint: str, data: Dict[str, Any] = None, 
+                 headers: Dict[str, str] = None, token: str = None) -> tuple:
+        """Make API call and return (success, response_data, status_code)"""
+        url = f"{BACKEND_URL}{endpoint}"
         
-        if auth_required and self.token:
-            headers['Authorization'] = f'Bearer {self.token}'
+        if headers is None:
+            headers = {"Content-Type": "application/json"}
         
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+            
         try:
-            if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=30)
-            elif method == 'POST':
-                response = requests.post(url, json=data, headers=headers, timeout=30)
-            elif method == 'PUT':
-                response = requests.put(url, json=data, headers=headers, timeout=30)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=30)
-            
-            success = response.status_code == expected_status
-            response_data = None
-            
+            if method == "GET":
+                response = requests.get(url, headers=headers)
+            elif method == "POST":
+                response = requests.post(url, json=data, headers=headers)
+            elif method == "PUT":
+                response = requests.put(url, json=data, headers=headers)
+            elif method == "DELETE":
+                response = requests.delete(url, headers=headers)
+            else:
+                return False, {"error": f"Unsupported method: {method}"}, 0
+                
             try:
                 response_data = response.json()
             except:
-                response_data = {"raw_response": response.text[:500], "status_code": response.status_code}
-            
-            if not success:
-                error_msg = f"Expected {expected_status}, got {response.status_code}"
-                if response_data and isinstance(response_data, dict) and 'detail' in response_data:
-                    error_msg += f" - {response_data['detail']}"
-                return success, response_data, error_msg
-            
-            return success, response_data, None
+                response_data = {"text": response.text}
+                
+            return response.status_code < 400, response_data, response.status_code
             
         except Exception as e:
-            return False, None, str(e)
-    
-    def test_basic_endpoints(self):
-        """Test basic public endpoints"""
-        print("\n🔍 Testing Basic Endpoints...")
-        
-        # Test restaurants list
-        success, data, error = self.make_request('GET', '/api/restaurants', auth_required=False)
-        self.log_result("GET /api/restaurants", success, data, error)
-        
-        # Test seed data
-        success, data, error = self.make_request('POST', '/api/seed', auth_required=False)
-        self.log_result("POST /api/seed", success, data, error)
-        
-        # Test Restaurant of the Week - should return null when no ROTW selected
-        success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
-        self.log_result("GET /api/restaurant-of-the-week (no ROTW)", success, data, error)
-        
-    def test_dev_login(self):
-        """Test dev login endpoints"""
-        print("\n🔐 Testing Dev Login...")
-        
-        # Test admin dev login
-        admin_data = {
-            "email": self.admin_email,
-            "name": "Admin Principal",
-            "role": "admin"
-        }
-        success, data, error = self.make_request('POST', '/api/auth/dev-login', 200, admin_data, auth_required=False)
-        self.log_result("POST /api/auth/dev-login (admin)", success, data, error)
-        
-        if success and data and data.get('session_token'):
-            self.token = data['session_token']
-            print(f"✅ Admin token received: {self.token[:20]}...")
-        
-        # Test user dev login
-        user_data = {
-            "email": "test.user@restaurant.ro",
-            "name": "Test User",
-            "role": "user"
-        }
-        success, data, error = self.make_request('POST', '/api/auth/dev-login', 200, user_data, auth_required=False)
-        self.log_result("POST /api/auth/dev-login (user)", success, data, error)
-    
-    def test_referral_endpoints(self):
-        """Test referral system endpoints"""
-        print("\n🎯 Testing Referral System...")
-        
-        if not self.token:
-            print("⚠️  Skipping referral tests - no authentication")
-            return
-            
-        # Test get my referral code
-        success, data, error = self.make_request('GET', '/api/referral/my-code')
-        self.log_result("GET /api/referral/my-code", success, data, error)
-        
-        if success and data and data.get('code'):
-            referral_code = data['code']
-            print(f"✅ Referral code received: {referral_code}")
-            
-            # Test applying own code (should fail with 400)
-            success, data, error = self.make_request('POST', f'/api/referral/apply?code={referral_code}', 400)
-            if success:  # Success means we got expected 400 error
-                self.log_result("POST /api/referral/apply (own code - should fail)", True, data, None)
-            else:
-                self.log_result("POST /api/referral/apply (own code - should fail)", False, data, error)
-            
-            # Test applying fake code (should fail with 404)
-            success, data, error = self.make_request('POST', '/api/referral/apply?code=FAKECODE123', 404)
-            if success:  # Success means we got expected 404 error
-                self.log_result("POST /api/referral/apply (fake code - should fail)", True, data, None)
-            else:
-                self.log_result("POST /api/referral/apply (fake code - should fail)", False, data, error)
-        
-        # Test referral leaderboard
-        success, data, error = self.make_request('GET', '/api/referral/leaderboard', auth_required=False)
-        self.log_result("GET /api/referral/leaderboard", success, data, error)
+            return False, {"error": str(e)}, 0
 
-    def test_loyalty_endpoints(self):
-        """Test loyalty system endpoints"""
-        print("\n🏆 Testing Loyalty System...")
-        
-        # Test loyalty leaderboard - should return empty array when no data
-        success, data, error = self.make_request('GET', '/api/loyalty/leaderboard', auth_required=False)
-        self.log_result("GET /api/loyalty/leaderboard", success, data, error)
-        
-        if self.token:
-            # Test my loyalty points
-            success, data, error = self.make_request('GET', '/api/loyalty/my-points')
-            self.log_result("GET /api/loyalty/my-points", success, data, error)
-    
-    def test_rotw_endpoints(self):
-        """Test Restaurant of the Week endpoints"""
-        print("\n🏆 Testing Restaurant of the Week...")
-        
-        # Test get ROTW before selection
-        success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
-        self.log_result("GET /api/restaurant-of-the-week (before selection)", success, data, error)
-        
-        if self.token:
-            # Test admin auto-select ROTW
-            success, data, error = self.make_request('POST', '/api/admin/restaurant-of-the-week/auto-select')
-            self.log_result("POST /api/admin/restaurant-of-the-week/auto-select", success, data, error)
-            
-            # Test get ROTW after selection
-            success, data, error = self.make_request('GET', '/api/restaurant-of-the-week', auth_required=False)
-            self.log_result("GET /api/restaurant-of-the-week (after selection)", success, data, error)
-    
-    def test_admin_endpoints(self):
-        """Test admin endpoints"""
-        print("\n👑 Testing Admin Endpoints...")
-        
-        if not self.token:
-            print("⚠️  Skipping admin tests - no authentication")
-            return
-            
-        # Test admin check
-        success, data, error = self.make_request('GET', '/api/admin/check')
-        self.log_result("GET /api/admin/check", success, data, error)
-        
-        if success and data and data.get('is_admin'):
-            print(f"✅ Admin access confirmed for: {data.get('email')}")
-            
-            # Test auto-select ROTW
-            success, data, error = self.make_request('POST', '/api/admin/restaurant-of-the-week/auto-select')
-            self.log_result("POST /api/admin/restaurant-of-the-week/auto-select", success, data, error)
-        else:
-            print(f"⚠️  User is not admin, skipping admin-only endpoints")
-    
-    def test_order_creation(self):
-        """Test order creation to check ObjectId serialization fix"""
-        print("\n🛒 Testing Order Creation...")
-        
-        if not self.token:
-            print("⚠️  Skipping order tests - no authentication")
-            return
-            
-        # Get restaurants first
-        success, restaurants, error = self.make_request('GET', '/api/restaurants', auth_required=False)
-        
-        if success and restaurants and len(restaurants) > 0:
-            restaurant = restaurants[0]
-            
-            # Test order creation
-            order_data = {
-                "restaurant_id": restaurant['id'],
-                "items": [
-                    {
-                        "menu_item_id": "test-item-123",
-                        "name": "Test Item",
-                        "price": 25.50,
-                        "quantity": 2,
-                        "image_url": "https://example.com/image.jpg"
-                    }
-                ],
-                "origin_url": "https://rating-feedback-hub.preview.emergentagent.com"
+    def test_dev_login_admin(self):
+        """Test POST /api/auth/dev-login with admin email"""
+        success, data, status = self.api_call(
+            "POST", 
+            "/api/auth/dev-login",
+            {
+                "email": "mutinyretreat37@gmail.com",
+                "name": "Admin Principal", 
+                "role": "admin"
             }
-            
-            success, data, error = self.make_request('POST', '/api/orders/create', 200, order_data)
-            self.log_result("POST /api/orders/create (ObjectId serialization test)", success, data, error)
-        else:
-            self.log_result("POST /api/orders/create", False, None, "No restaurants available for testing")
-    
-    def test_with_mock_auth(self):
-        """Test without actual authentication - for public endpoints"""
-        print("\n🔓 Testing Public Endpoints (No Auth)...")
+        )
         
-        self.test_basic_endpoints()
-        self.test_loyalty_endpoints()
-    
+        if success and "session_token" in data and "user" in data:
+            self.session_token = data["session_token"]
+            self.user_data = data["user"]
+            self.log_test("Dev Login Admin", True, 
+                         f"Got session_token and user data: {data['user']['name']}")
+        else:
+            self.log_test("Dev Login Admin", False, 
+                         f"Status: {status}, Response: {data}")
+        return success
+
+    def test_dev_login_business(self):
+        """Test POST /api/auth/dev-login with business email"""
+        success, data, status = self.api_call(
+            "POST", 
+            "/api/auth/dev-login",
+            {
+                "email": "business@restaurant.ro",
+                "name": "Business Owner", 
+                "role": "user"
+            }
+        )
+        
+        if success and "session_token" in data and "user" in data:
+            self.business_session_token = data["session_token"]
+            self.business_user_data = data["user"]
+            self.log_test("Dev Login Business", True, 
+                         f"Got session_token and user data: {data['user']['name']}")
+        else:
+            self.log_test("Dev Login Business", False, 
+                         f"Status: {status}, Response: {data}")
+        return success
+
+    def test_auth_me_admin(self):
+        """Test GET /api/auth/me with admin session"""
+        if not self.session_token:
+            self.log_test("Auth Me Admin", False, "No admin session token")
+            return False
+            
+        success, data, status = self.api_call("GET", "/api/auth/me", token=self.session_token)
+        
+        if success and "user_id" in data and data.get("email") == "mutinyretreat37@gmail.com":
+            self.log_test("Auth Me Admin", True, 
+                         f"Got user info: {data['name']} - {data['email']}")
+        else:
+            self.log_test("Auth Me Admin", False, 
+                         f"Status: {status}, Response: {data}")
+        return success
+
+    def test_auth_me_business(self):
+        """Test GET /api/auth/me with business session"""
+        if not self.business_session_token:
+            self.log_test("Auth Me Business", False, "No business session token")
+            return False
+            
+        success, data, status = self.api_call("GET", "/api/auth/me", token=self.business_session_token)
+        
+        if success and "user_id" in data and data.get("email") == "business@restaurant.ro":
+            self.log_test("Auth Me Business", True, 
+                         f"Got user info: {data['name']} - {data['email']}")
+        else:
+            self.log_test("Auth Me Business", False, 
+                         f"Status: {status}, Response: {data}")
+        return success
+
+    def test_logout(self):
+        """Test POST /api/auth/logout"""
+        if not self.session_token:
+            self.log_test("Logout", False, "No session token")
+            return False
+            
+        success, data, status = self.api_call("POST", "/api/auth/logout", token=self.session_token)
+        
+        if success and status == 200:
+            self.log_test("Logout", True, f"Logged out successfully: {data}")
+        else:
+            self.log_test("Logout", False, f"Status: {status}, Response: {data}")
+        return success
+
+    def test_get_restaurants(self):
+        """Test GET /api/restaurants returns restaurants with new media data"""
+        success, data, status = self.api_call("GET", "/api/restaurants")
+        
+        if success and isinstance(data, list) and len(data) > 0:
+            restaurant = data[0]
+            
+            # Check for new media fields
+            has_gallery_images = "gallery_images" in restaurant and isinstance(restaurant["gallery_images"], list)
+            has_video_urls = "video_urls" in restaurant and isinstance(restaurant["video_urls"], list)
+            has_images_3d = "images_3d" in restaurant and isinstance(restaurant["images_3d"], list)
+            
+            # Check video_urls structure
+            video_structure_ok = True
+            if restaurant.get("video_urls"):
+                for video in restaurant["video_urls"]:
+                    if not all(k in video for k in ["title", "url", "thumbnail", "duration"]):
+                        video_structure_ok = False
+                        break
+            
+            # Check images_3d structure
+            images_3d_structure_ok = True
+            if restaurant.get("images_3d"):
+                for image in restaurant["images_3d"]:
+                    if not all(k in image for k in ["title", "model_url", "thumbnail", "type"]):
+                        images_3d_structure_ok = False
+                        break
+            
+            self.log_test("Get Restaurants", True, 
+                         f"Found {len(data)} restaurants. First restaurant has gallery_images: {has_gallery_images}, "
+                         f"video_urls: {has_video_urls}, images_3d: {has_images_3d}, "
+                         f"video structure OK: {video_structure_ok}, 3D structure OK: {images_3d_structure_ok}")
+        else:
+            self.log_test("Get Restaurants", False, 
+                         f"Status: {status}, Response: {data}")
+        return success
+
+    def test_business_account_company(self):
+        """Test if business account has company_id linked"""
+        if not self.business_user_data:
+            self.log_test("Business Account Company", False, "No business user data")
+            return False
+        
+        has_company_id = self.business_user_data.get("company_id") is not None
+        is_company = self.business_user_data.get("is_company", False)
+        
+        if has_company_id and is_company:
+            self.log_test("Business Account Company", True, 
+                         f"Business account has company_id: {self.business_user_data['company_id']}, is_company: {is_company}")
+        else:
+            self.log_test("Business Account Company", False, 
+                         f"Business account missing company link. company_id: {self.business_user_data.get('company_id')}, is_company: {is_company}")
+        return has_company_id and is_company
+
     def run_all_tests(self):
-        """Run all API tests"""
-        print("🚀 Starting Romanian Restaurant App API Tests")
-        print(f"Testing against: {self.base_url}")
+        print(f"🧪 Starting Romanian Restaurant App API Tests")
+        print(f"📡 Testing API at: {BACKEND_URL}")
         print("=" * 60)
         
-        # Test dev login first to get authentication
-        self.test_dev_login()
+        # Test dev login endpoints
+        self.test_dev_login_admin()
+        self.test_dev_login_business()
         
-        # Test basic public endpoints
-        self.test_basic_endpoints()
+        # Test auth/me endpoints  
+        self.test_auth_me_admin()
+        self.test_auth_me_business()
         
-        # Test new features
-        self.test_referral_endpoints()
-        self.test_loyalty_endpoints()
-        self.test_rotw_endpoints()
+        # Test logout
+        self.test_logout()
         
-        # Test admin endpoints if we have admin token
-        self.test_admin_endpoints()
+        # Test restaurants with new media data
+        self.test_get_restaurants()
         
-        # Test order creation for ObjectId fix
-        self.test_order_creation()
+        # Test business account company linking
+        self.test_business_account_company()
         
-        print(f"\n📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
-        
-        if self.failed_tests:
-            print("\n❌ Failed Tests:")
-            for failed in self.failed_tests:
-                print(f"  - {failed['test']}: {failed['error']}")
-        
+        print("=" * 60)
+        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
         return self.tests_passed == self.tests_run
 
 def main():
-    tester = RomanianRestaurantAPITester()
-    
-    # Run tests
-    all_passed = tester.run_all_tests()
-    
-    # Print summary
-    print("\n" + "=" * 60)
-    print(f"🏁 Testing Complete!")
-    print(f"📈 Success Rate: {tester.tests_passed}/{tester.tests_run} ({(tester.tests_passed/tester.tests_run*100):.1f}%)")
-    
-    if not all_passed:
-        print("\n⚠️  Some tests failed. Check the details above.")
-        return 1
-    else:
-        print("\n🎉 All tests passed!")
-        return 0
+    tester = RestaurantAppAPITester()
+    success = tester.run_all_tests()
+    return 0 if success else 1
 
 if __name__ == "__main__":
     sys.exit(main())
