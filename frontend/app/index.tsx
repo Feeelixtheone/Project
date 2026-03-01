@@ -18,6 +18,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../src/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { devLogin } from '../src/utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AuthMode = 'welcome' | 'login' | 'register' | 'company';
 
