@@ -138,6 +138,7 @@ export default function ProfilScreen() {
         rating: feedbackRating,
         food_rating: feedbackFoodRating,
         service_rating: feedbackServiceRating,
+        ambiance_rating: feedbackAmbianceRating,
         comment: feedbackComment,
         would_recommend: feedbackRecommend,
       });
