@@ -231,6 +231,18 @@ class MenuItem(BaseModel):
     fiber: Optional[float] = None
     allergens: Optional[List[str]] = None
 
+class VideoMedia(BaseModel):
+    title: str = ""
+    url: str = ""
+    thumbnail: str = ""
+    duration: str = ""
+
+class Media3D(BaseModel):
+    title: str = ""
+    model_url: str = ""
+    thumbnail: str = ""
+    type: str = "food"
+
 class Restaurant(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -240,7 +252,9 @@ class Restaurant(BaseModel):
     longitude: float
     cover_image: str
     interior_images: List[str] = []
-    images_3d: List[str] = []
+    gallery_images: List[str] = []
+    video_urls: List[Any] = []
+    images_3d: List[Any] = []
     rating: float = 0.0
     review_count: int = 0
     likes: int = 0
