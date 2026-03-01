@@ -3676,9 +3676,6 @@ async def remove_push_token(user: User = Depends(require_auth)):
 
 # ==================== REFERRAL SYSTEM ====================
 
-import random
-import string
-
 REFERRAL_BONUS_POINTS = 50  # Bonus for referrer when friend completes first order
 REFERRAL_WELCOME_POINTS = 25  # Bonus for referred user on signup
 
