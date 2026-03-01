@@ -225,11 +225,23 @@ class RomanianRestaurantAPITester:
         print(f"Testing against: {self.base_url}")
         print("=" * 60)
         
-        # Test public endpoints first
-        self.test_with_mock_auth()
+        # Test dev login first to get authentication
+        self.test_dev_login()
         
-        # Note: Real authentication would require Google OAuth flow
-        # For testing purposes, we'll focus on public endpoints
+        # Test basic public endpoints
+        self.test_basic_endpoints()
+        
+        # Test new features
+        self.test_referral_endpoints()
+        self.test_loyalty_endpoints()
+        self.test_rotw_endpoints()
+        
+        # Test admin endpoints if we have admin token
+        self.test_admin_endpoints()
+        
+        # Test order creation for ObjectId fix
+        self.test_order_creation()
+        
         print(f"\n📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
         
         if self.failed_tests:
