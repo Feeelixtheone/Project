@@ -207,6 +207,20 @@ export default function ProfilScreen() {
         <Text style={styles.profileEmail}>{user?.email}</Text>
       </View>
 
+      {/* Loyalty Points Quick Access */}
+      <TouchableOpacity
+        style={styles.loyaltyQuickAccess}
+        onPress={() => router.push('/loyalty')}
+        data-testid="profile-loyalty-btn"
+      >
+        <Ionicons name="diamond" size={24} color={COLORS.gold} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.text }}>Puncte de Loialitate</Text>
+          <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textSecondary }}>Castiga puncte la fiecare comanda</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+      </TouchableOpacity>
+
       {/* Profile Details */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
