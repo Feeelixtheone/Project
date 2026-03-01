@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
-  ActivityIndicator, RefreshControl, Dimensions
+  ActivityIndicator, RefreshControl, TextInput, Platform, Alert, Share
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../src/constants/theme';
 import { useAuth } from '../src/context/AuthContext';
-import { getMyLoyaltyPoints, getLoyaltyLeaderboard } from '../src/utils/api';
-
-const { width } = Dimensions.get('window');
+import { getMyLoyaltyPoints, getLoyaltyLeaderboard, getMyReferralCode, applyReferralCode, getReferralLeaderboard } from '../src/utils/api';
+import * as Clipboard from 'expo-clipboard';
 
 const LEVEL_CONFIG: Record<string, { color: string; icon: string; minPoints: number; nextLevel?: string; nextPoints?: number }> = {
   Bronze: { color: '#CD7F32', icon: 'shield', minPoints: 0, nextLevel: 'Silver', nextPoints: 500 },
@@ -22,20 +21,31 @@ const LEVEL_CONFIG: Record<string, { color: string; icon: string; minPoints: num
 export default function LoyaltyScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'leaderboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'leaderboard' | 'referral'>('overview');
   const [pointsData, setPointsData] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Referral
+  const [referralData, setReferralData] = useState<any>(null);
+  const [referralCode, setReferralCodeInput] = useState('');
+  const [applyingCode, setApplyingCode] = useState(false);
+  const [referralLeaderboard, setReferralLeaderboard] = useState<any[]>([]);
+  const [copied, setCopied] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [pts, lb] = await Promise.all([
+      const [pts, lb, ref, refLb] = await Promise.all([
         getMyLoyaltyPoints().catch(() => null),
         getLoyaltyLeaderboard().catch(() => []),
+        getMyReferralCode().catch(() => null),
+        getReferralLeaderboard().catch(() => []),
       ]);
       setPointsData(pts);
       setLeaderboard(lb);
+      setReferralData(ref);
+      setReferralLeaderboard(refLb);
     } catch (e) {} finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,6 +55,48 @@ export default function LoyaltyScreen() {
   useEffect(() => { loadData(); }, []);
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
+
+  const handleCopyCode = async () => {
+    if (referralData?.code) {
+      try {
+        await Clipboard.setStringAsync(referralData.code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // Fallback for web
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(referralData.code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }
+      }
+    }
+  };
+
+  const handleShareCode = async () => {
+    if (!referralData?.code) return;
+    const msg = `Incearca RestaurantApp! Foloseste codul meu ${referralData.code} si primesti ${referralData.welcome_bonus} puncte bonus! 🎉`;
+    try {
+      await Share.share({ message: msg });
+    } catch {}
+  };
+
+  const handleApplyCode = async () => {
+    if (!referralCode.trim()) return;
+    setApplyingCode(true);
+    try {
+      const result = await applyReferralCode(referralCode.trim());
+      const msg = result.message || 'Cod aplicat!';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
+      setReferralCodeInput('');
+      loadData();
+    } catch (error: any) {
+      const msg = error.message || 'Eroare';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setApplyingCode(false);
+    }
+  };
 
   const levelConfig = LEVEL_CONFIG[pointsData?.level || 'Bronze'];
   const progress = pointsData && levelConfig.nextPoints
@@ -66,26 +118,24 @@ export default function LoyaltyScreen() {
         <TouchableOpacity onPress={() => router.back()} data-testid="loyalty-back-btn">
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Puncte de Loialitate</Text>
+        <Text style={styles.headerTitle}>Puncte & Referral</Text>
         <View style={{ width: 24 }} />
       </View>
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
-          onPress={() => setActiveTab('overview')}
-          data-testid="loyalty-tab-overview"
-        >
-          <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Punctele mele</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'leaderboard' && styles.tabActive]}
-          onPress={() => setActiveTab('leaderboard')}
-          data-testid="loyalty-tab-leaderboard"
-        >
-          <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.tabTextActive]}>Clasament</Text>
-        </TouchableOpacity>
+        {(['overview', 'leaderboard', 'referral'] as const).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+            data-testid={`loyalty-tab-${tab}`}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              {tab === 'overview' ? 'Puncte' : tab === 'leaderboard' ? 'Clasament' : 'Referral'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView
@@ -107,8 +157,6 @@ export default function LoyaltyScreen() {
                   <Text style={[styles.levelText, { color: levelConfig.color }]}>{pointsData?.level || 'Bronze'}</Text>
                 </View>
               </View>
-
-              {/* Progress to next level */}
               {levelConfig.nextLevel && (
                 <View style={styles.progressSection}>
                   <View style={styles.progressHeader}>
@@ -132,9 +180,9 @@ export default function LoyaltyScreen() {
                   <Text style={styles.howCardDesc}>1 punct / RON</Text>
                 </View>
                 <View style={styles.howCard}>
-                  <Ionicons name="trending-up" size={24} color={COLORS.secondary} />
-                  <Text style={styles.howCardTitle}>Acumuleaza</Text>
-                  <Text style={styles.howCardDesc}>Cresti in nivel</Text>
+                  <Ionicons name="people" size={24} color={COLORS.secondary} />
+                  <Text style={styles.howCardTitle}>Invita</Text>
+                  <Text style={styles.howCardDesc}>+50 puncte/prieten</Text>
                 </View>
                 <View style={styles.howCard}>
                   <Ionicons name="gift" size={24} color={COLORS.gold} />
@@ -168,22 +216,23 @@ export default function LoyaltyScreen() {
                 pointsData.history.map((h: any) => (
                   <View key={h.id} style={styles.historyRow}>
                     <View style={styles.historyLeft}>
-                      <Ionicons name={h.type === 'earned' ? 'add-circle' : 'remove-circle'} size={20} color={h.type === 'earned' ? COLORS.success : COLORS.error} />
-                      <View>
+                      <Ionicons
+                        name={h.type === 'earned' ? 'add-circle' : h.type === 'referral_welcome' || h.type === 'referral_bonus' ? 'people-circle' : 'remove-circle'}
+                        size={20}
+                        color={h.type === 'earned' || h.type === 'referral_welcome' || h.type === 'referral_bonus' ? COLORS.success : COLORS.error}
+                      />
+                      <View style={{ flex: 1 }}>
                         <Text style={styles.historyDesc}>{h.description}</Text>
                         <Text style={styles.historyDate}>{new Date(h.created_at).toLocaleDateString('ro-RO')}</Text>
                       </View>
                     </View>
-                    <Text style={[styles.historyPoints, { color: h.type === 'earned' ? COLORS.success : COLORS.error }]}>
-                      {h.type === 'earned' ? '+' : '-'}{h.points}
-                    </Text>
+                    <Text style={[styles.historyPoints, { color: COLORS.success }]}>+{h.points}</Text>
                   </View>
                 ))
               )}
             </View>
           </>
-        ) : (
-          /* Leaderboard */
+        ) : activeTab === 'leaderboard' ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Top Utilizatori</Text>
             {leaderboard.length === 0 ? (
@@ -193,7 +242,7 @@ export default function LoyaltyScreen() {
                 const isMe = entry.user_id === user?.user_id;
                 const medalColor = index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : COLORS.textMuted;
                 return (
-                  <View key={entry.user_id} style={[styles.leaderboardRow, isMe && styles.leaderboardRowMe]} data-testid={`leaderboard-rank-${entry.rank}`}>
+                  <View key={entry.user_id} style={[styles.leaderboardRow, isMe && styles.leaderboardRowMe]}>
                     <View style={styles.leaderboardRank}>
                       {index < 3 ? (
                         <Ionicons name="medal" size={24} color={medalColor} />
@@ -220,6 +269,141 @@ export default function LoyaltyScreen() {
               })
             )}
           </View>
+        ) : (
+          /* Referral Tab */
+          <>
+            {/* My Referral Code */}
+            <View style={styles.referralCard} data-testid="referral-card">
+              <View style={styles.referralIconRow}>
+                <View style={styles.referralIconCircle}>
+                  <Ionicons name="gift" size={32} color={COLORS.primary} />
+                </View>
+              </View>
+              <Text style={styles.referralTitle}>Invita prieteni, castiga puncte!</Text>
+              <Text style={styles.referralSubtitle}>
+                Primesti <Text style={{ color: COLORS.gold, fontFamily: FONTS.bold }}>{referralData?.referral_bonus || 50}</Text> puncte cand prietenul plaseaza prima comanda.
+                Prietenul primeste <Text style={{ color: COLORS.gold, fontFamily: FONTS.bold }}>{referralData?.welcome_bonus || 25}</Text> puncte la inscriere!
+              </Text>
+              
+              {/* Code display */}
+              <View style={styles.codeBox}>
+                <Text style={styles.codeLabel}>Codul tau de referral</Text>
+                <View style={styles.codeRow}>
+                  <Text style={styles.codeValue} data-testid="referral-code">{referralData?.code || '...'}</Text>
+                  <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode} data-testid="referral-copy-btn">
+                    <Ionicons name={copied ? 'checkmark' : 'copy'} size={18} color={copied ? COLORS.success : COLORS.text} />
+                    <Text style={[styles.copyBtnText, copied && { color: COLORS.success }]}>{copied ? 'Copiat!' : 'Copiaza'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Share button */}
+              <TouchableOpacity style={styles.shareBtn} onPress={handleShareCode} data-testid="referral-share-btn">
+                <Ionicons name="share-social" size={20} color="#fff" />
+                <Text style={styles.shareBtnText}>Trimite prietenilor</Text>
+              </TouchableOpacity>
+
+              {/* Stats */}
+              <View style={styles.referralStats}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{referralData?.total_referrals || 0}</Text>
+                  <Text style={styles.statLabel}>Prieteni invitati</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{referralData?.total_points_earned || 0}</Text>
+                  <Text style={styles.statLabel}>Puncte castigate</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Apply Code */}
+            <View style={styles.applySection}>
+              <Text style={styles.sectionTitle}>Ai un cod de referral?</Text>
+              <View style={styles.applyRow}>
+                <TextInput
+                  style={styles.applyInput}
+                  value={referralCode}
+                  onChangeText={setReferralCodeInput}
+                  placeholder="Introdu codul"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="characters"
+                  data-testid="referral-apply-input"
+                />
+                <TouchableOpacity
+                  style={[styles.applyBtn, (!referralCode.trim() || applyingCode) && { opacity: 0.5 }]}
+                  onPress={handleApplyCode}
+                  disabled={!referralCode.trim() || applyingCode}
+                  data-testid="referral-apply-btn"
+                >
+                  {applyingCode ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.applyBtnText}>Aplica</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Referral History */}
+            {(referralData?.history || []).length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Prieteni invitati</Text>
+                {referralData.history.map((h: any) => (
+                  <View key={h.id} style={styles.historyRow}>
+                    <View style={styles.historyLeft}>
+                      <Ionicons
+                        name={h.status === 'completed' ? 'checkmark-circle' : 'time'}
+                        size={20}
+                        color={h.status === 'completed' ? COLORS.success : COLORS.warning}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.historyDesc}>{h.referred_name}</Text>
+                        <Text style={styles.historyDate}>
+                          {h.status === 'completed' ? 'A plasat o comanda' : 'In asteptare'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.historyPoints, { color: h.status === 'completed' ? COLORS.success : COLORS.textMuted }]}>
+                      {h.status === 'completed' ? '+50 pts' : 'Pending'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Referral Leaderboard */}
+            {referralLeaderboard.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Top Referreri</Text>
+                {referralLeaderboard.map((entry: any) => (
+                  <View key={entry.rank} style={styles.leaderboardRow}>
+                    <View style={styles.leaderboardRank}>
+                      {entry.rank <= 3 ? (
+                        <Ionicons name="medal" size={24} color={entry.rank === 1 ? '#FFD700' : entry.rank === 2 ? '#C0C0C0' : '#CD7F32'} />
+                      ) : (
+                        <Text style={styles.rankNumber}>#{entry.rank}</Text>
+                      )}
+                    </View>
+                    <View style={styles.leaderboardAvatar}>
+                      {entry.picture ? (
+                        <Image source={{ uri: entry.picture }} style={styles.avatarImage} />
+                      ) : (
+                        <View style={[styles.avatarPlaceholder, { backgroundColor: COLORS.primary + '30' }]}>
+                          <Text style={styles.avatarInitial}>{entry.name?.charAt(0)?.toUpperCase()}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.leaderboardInfo}>
+                      <Text style={styles.leaderboardName}>{entry.name}</Text>
+                      <Text style={styles.leaderboardLevel}>{entry.total_referrals} referral(s)</Text>
+                    </View>
+                    <Text style={[styles.leaderboardPoints, { color: COLORS.gold }]}>{entry.total_points_earned} pts</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -240,7 +424,7 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: BORDER_RADIUS.sm },
   tabActive: { backgroundColor: COLORS.primary },
-  tabText: { fontFamily: FONTS.medium, fontSize: 14, color: COLORS.textMuted },
+  tabText: { fontFamily: FONTS.medium, fontSize: 13, color: COLORS.textMuted },
   tabTextActive: { color: '#fff' },
   scrollView: { flex: 1, paddingHorizontal: SPACING.lg },
   pointsCard: {
@@ -301,6 +485,51 @@ const styles = StyleSheet.create({
   avatarInitial: { fontFamily: FONTS.bold, fontSize: 18, color: COLORS.text },
   leaderboardInfo: { flex: 1 },
   leaderboardName: { fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.text },
-  leaderboardLevel: { fontFamily: FONTS.regular, fontSize: 12 },
+  leaderboardLevel: { fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textSecondary },
   leaderboardPoints: { fontFamily: FONTS.bold, fontSize: 16 },
+  // Referral styles
+  referralCard: {
+    backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
+    marginBottom: SPACING.lg, borderWidth: 1, borderColor: COLORS.primary + '40',
+    alignItems: 'center',
+  },
+  referralIconRow: { marginBottom: SPACING.md },
+  referralIconCircle: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.primary + '20',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  referralTitle: { fontFamily: FONTS.bold, fontSize: 18, color: COLORS.text, textAlign: 'center', marginBottom: SPACING.xs },
+  referralSubtitle: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.lg, lineHeight: 20 },
+  codeBox: {
+    width: '100%', backgroundColor: COLORS.surfaceLight, borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md, marginBottom: SPACING.md,
+  },
+  codeLabel: { fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textMuted, marginBottom: SPACING.xs },
+  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  codeValue: { fontFamily: FONTS.bold, fontSize: 24, color: COLORS.gold, letterSpacing: 3 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.surfaceElevated, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.sm },
+  copyBtnText: { fontFamily: FONTS.medium, fontSize: 13, color: COLORS.text },
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.primary, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md, marginBottom: SPACING.lg,
+  },
+  shareBtnText: { fontFamily: FONTS.semiBold, fontSize: 14, color: '#fff' },
+  referralStats: { flexDirection: 'row', width: '100%' },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontFamily: FONTS.bold, fontSize: 24, color: COLORS.text },
+  statLabel: { fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textMuted },
+  statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: SPACING.xs },
+  applySection: { marginBottom: SPACING.lg },
+  applyRow: { flexDirection: 'row', gap: SPACING.sm },
+  applyInput: {
+    flex: 1, backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md, fontFamily: FONTS.medium, fontSize: 16, color: COLORS.text,
+    borderWidth: 1, borderColor: COLORS.border, letterSpacing: 2,
+  },
+  applyBtn: {
+    backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg, borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  applyBtnText: { fontFamily: FONTS.semiBold, fontSize: 14, color: '#fff' },
 });
