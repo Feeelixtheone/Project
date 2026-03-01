@@ -48,6 +48,8 @@ export default function RestaurantDetailScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [specialOffers, setSpecialOffers] = useState<any[]>([]);
   const [feedbackList, setFeedbackList] = useState<any[]>([]);
+  const [isROTW, setIsROTW] = useState(false);
+  const [rotwDiscount, setRotwDiscount] = useState(0);
   
   // Modals
   const [showReservationModal, setShowReservationModal] = useState(false);
