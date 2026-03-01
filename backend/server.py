@@ -1573,6 +1573,176 @@ async def seed_data():
     ]
     
     await db.restaurants.insert_many(restaurants)
+    
+    # Seed business account with company and linked restaurant
+    business_email = "business@restaurant.ro"
+    business_user_id = f"user_business_{uuid.uuid4().hex[:8]}"
+    
+    # Check if business user exists
+    existing_business = await db.users.find_one({"email": business_email})
+    if not existing_business:
+        await db.users.insert_one({
+            "user_id": business_user_id,
+            "email": business_email,
+            "name": "Business Owner",
+            "picture": None,
+            "phone": "+40 722 111 222",
+            "address": "Str. Victoriei 45, București",
+            "is_company": True,
+            "company_id": None,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        company_id = str(uuid.uuid4())
+        first_restaurant = restaurants[0]
+        
+        await db.companies.insert_one({
+            "id": company_id,
+            "owner_id": business_user_id,
+            "company_name": "Casa Veche SRL",
+            "cui": "RO12345678",
+            "email": business_email,
+            "phone": "+40 722 111 222",
+            "is_verified": True,
+            "status": "active",
+            "restaurant_ids": [first_restaurant["id"]],
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        await db.users.update_one(
+            {"user_id": business_user_id},
+            {"$set": {"is_company": True, "company_id": company_id}}
+        )
+        
+        # Create dev session for business user
+        await db.user_sessions.insert_one({
+            "user_id": business_user_id,
+            "session_token": f"dev_business_preset",
+            "expires_at": datetime(2030, 1, 1, tzinfo=timezone.utc),
+            "created_at": datetime.now(timezone.utc)
+        })
+    
+    # Update restaurants with 2D gallery, video and 3D media
+    media_updates = [
+        {
+            "name": "Casa Veche",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+                "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800",
+                "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=800",
+                "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=800"
+            ],
+            "video_urls": [
+                {"title": "Tour virtual Casa Veche", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400", "duration": "2:30"},
+                {"title": "Preparare Sarmale", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400", "duration": "1:45"}
+            ],
+            "images_3d": [
+                {"title": "Sarmale 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400", "type": "food"},
+                {"title": "Interior 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Horse.glb", "thumbnail": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400", "type": "interior"}
+            ]
+        },
+        {
+            "name": "Bucătăria Modernă",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=800",
+                "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800",
+                "https://images.unsplash.com/photo-1578474846511-04ba529f0b88?w=800"
+            ],
+            "video_urls": [
+                {"title": "Chef special Risotto", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=400", "duration": "3:15"}
+            ],
+            "images_3d": [
+                {"title": "Risotto 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=400", "type": "food"}
+            ]
+        },
+        {
+            "name": "Pescăruș",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1538333581680-29dd4752ddf2?w=800",
+                "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
+                "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800"
+            ],
+            "video_urls": [
+                {"title": "Fresh Catch prezentare", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1538333581680-29dd4752ddf2?w=400", "duration": "2:00"}
+            ],
+            "images_3d": [
+                {"title": "Gratar Peste 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Horse.glb", "thumbnail": "https://images.unsplash.com/photo-1538333581680-29dd4752ddf2?w=400", "type": "food"}
+            ]
+        },
+        {
+            "name": "La Mama",
+            "gallery_images": [
+                "https://images.pexels.com/photos/785541/pexels-photo-785541.jpeg?w=800",
+                "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
+            ],
+            "video_urls": [
+                {"title": "La Mama - Atmosfera", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.pexels.com/photos/785541/pexels-photo-785541.jpeg?w=400", "duration": "1:30"}
+            ],
+            "images_3d": []
+        },
+        {
+            "name": "Sushi Master",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800",
+                "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800",
+                "https://images.unsplash.com/photo-1553621042-f6e147245754?w=800"
+            ],
+            "video_urls": [
+                {"title": "Sushi Making Art", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400", "duration": "4:20"},
+                {"title": "Omakase Experience", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400", "duration": "3:00"}
+            ],
+            "images_3d": [
+                {"title": "Dragon Roll 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400", "type": "food"},
+                {"title": "Sushi Bar 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Horse.glb", "thumbnail": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400", "type": "interior"}
+            ]
+        },
+        {
+            "name": "Sky Lounge Rooftop",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800",
+                "https://images.unsplash.com/photo-1544124499-58912cbddaad?w=800",
+                "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800",
+                "https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?w=800",
+                "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=800"
+            ],
+            "video_urls": [
+                {"title": "Sky Lounge Sunset View", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400", "duration": "2:45"},
+                {"title": "Wagyu A5 Preparation", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400", "duration": "3:30"},
+                {"title": "Cocktail Masterclass", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?w=400", "duration": "5:00"}
+            ],
+            "images_3d": [
+                {"title": "Wagyu Steak 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400", "type": "food"},
+                {"title": "Rooftop 360 View", "model_url": "https://modelviewer.dev/shared-assets/models/Horse.glb", "thumbnail": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400", "type": "panorama"},
+                {"title": "Lobster Thermidor 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400", "type": "food"}
+            ]
+        },
+        {
+            "name": "The Steakhouse Premium",
+            "gallery_images": [
+                "https://images.unsplash.com/photo-1544025162-d76694265947?w=800",
+                "https://images.unsplash.com/photo-1558030006-450675393462?w=800",
+                "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800"
+            ],
+            "video_urls": [
+                {"title": "Dry-Aging Process", "url": "https://www.youtube.com/embed/dQw4w9WgXcQ", "thumbnail": "https://images.unsplash.com/photo-1558030006-450675393462?w=400", "duration": "4:00"}
+            ],
+            "images_3d": [
+                {"title": "Ribeye 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", "thumbnail": "https://images.unsplash.com/photo-1558030006-450675393462?w=400", "type": "food"},
+                {"title": "Tomahawk 3D", "model_url": "https://modelviewer.dev/shared-assets/models/Horse.glb", "thumbnail": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400", "type": "food"}
+            ]
+        }
+    ]
+    
+    for update in media_updates:
+        await db.restaurants.update_one(
+            {"name": update["name"]},
+            {"$set": {
+                "gallery_images": update["gallery_images"],
+                "video_urls": update["video_urls"],
+                "images_3d": update["images_3d"]
+            }}
+        )
+    
     return {"message": "Date inițiale adăugate", "count": len(restaurants)}
 
 # ==================== CUI VERIFICATION ====================
