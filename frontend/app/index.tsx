@@ -43,6 +43,23 @@ export default function WelcomeScreen() {
     }
   }, [isAuthenticated, isLoading]);
 
+  const handleDevLogin = async (email: string, name: string, role: string) => {
+    setDevLoginLoading(email);
+    try {
+      const result = await devLogin(email, name, role);
+      if (result.session_token) {
+        await AsyncStorage.setItem('session_token', result.session_token);
+        await refreshUser();
+        router.replace('/(tabs)/acasa');
+      }
+    } catch (error: any) {
+      const msg = error.message || 'Eroare la autentificare';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
+    } finally {
+      setDevLoginLoading(null);
+    }
+  };
+
   const validateCui = (value: string) => {
     setCui(value);
     if (value.length > 0) {
