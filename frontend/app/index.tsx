@@ -579,6 +579,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
   },
+  devBusinessBtn: {
+    borderColor: COLORS.secondary + '60',
+  },
   // Company Registration Styles
   formScrollContent: {
     padding: SPACING.lg,
