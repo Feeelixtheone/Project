@@ -3633,6 +3633,201 @@ async def remove_push_token(user: User = Depends(require_auth)):
     await db.push_tokens.delete_one({"user_id": user.user_id})
     return {"message": "Token eliminat"}
 
+# ==================== REFERRAL SYSTEM ====================
+
+import random
+import string
+
+REFERRAL_BONUS_POINTS = 50  # Bonus for referrer when friend completes first order
+REFERRAL_WELCOME_POINTS = 25  # Bonus for referred user on signup
+
+def generate_referral_code(length=8):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+@api_router.get("/referral/my-code")
+async def get_my_referral_code(user: User = Depends(require_auth)):
+    """Get or create user's referral code"""
+    ref_doc = await db.referrals.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not ref_doc:
+        code = generate_referral_code()
+        # Ensure unique
+        while await db.referrals.find_one({"code": code}):
+            code = generate_referral_code()
+        ref_doc = {
+            "user_id": user.user_id,
+            "code": code,
+            "total_referrals": 0,
+            "total_points_earned": 0,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.referrals.insert_one(ref_doc)
+        ref_doc.pop("_id", None)
+    
+    # Get referral history
+    history = await db.referral_history.find(
+        {"referrer_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    return {
+        "code": ref_doc["code"],
+        "total_referrals": ref_doc.get("total_referrals", 0),
+        "total_points_earned": ref_doc.get("total_points_earned", 0),
+        "referral_bonus": REFERRAL_BONUS_POINTS,
+        "welcome_bonus": REFERRAL_WELCOME_POINTS,
+        "history": history
+    }
+
+@api_router.post("/referral/apply")
+async def apply_referral_code(code: str, user: User = Depends(require_auth)):
+    """Apply a referral code (new user applies friend's code)"""
+    # Check if user already used a referral code
+    existing = await db.referral_history.find_one({"referred_id": user.user_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ai folosit deja un cod de referral")
+    
+    # Find referrer by code
+    ref_doc = await db.referrals.find_one({"code": code.upper()}, {"_id": 0})
+    if not ref_doc:
+        raise HTTPException(status_code=404, detail="Cod de referral invalid")
+    
+    if ref_doc["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Nu poti folosi propriul cod de referral")
+    
+    # Award welcome bonus to the new user
+    await db.loyalty_points.update_one(
+        {"user_id": user.user_id},
+        {
+            "$inc": {"total_points": REFERRAL_WELCOME_POINTS, "lifetime_points": REFERRAL_WELCOME_POINTS},
+            "$setOnInsert": {"created_at": datetime.now(timezone.utc)}
+        },
+        upsert=True
+    )
+    await db.loyalty_history.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "order_id": None,
+        "points": REFERRAL_WELCOME_POINTS,
+        "amount_spent": 0,
+        "restaurant_name": "",
+        "type": "referral_welcome",
+        "description": f"+{REFERRAL_WELCOME_POINTS} puncte bonus de bun-venit (referral)",
+        "created_at": datetime.now(timezone.utc)
+    })
+    
+    # Record the referral (bonus for referrer awarded when referred user makes first order)
+    await db.referral_history.insert_one({
+        "id": str(uuid.uuid4()),
+        "referrer_id": ref_doc["user_id"],
+        "referred_id": user.user_id,
+        "referred_name": user.name,
+        "code": code.upper(),
+        "status": "pending",  # becomes "completed" when referred user places first order
+        "referrer_bonus_awarded": False,
+        "created_at": datetime.now(timezone.utc)
+    })
+    
+    # Update referral count
+    await db.referrals.update_one(
+        {"user_id": ref_doc["user_id"]},
+        {"$inc": {"total_referrals": 1}}
+    )
+    
+    # Notify the referrer
+    referrer_user = await db.users.find_one({"user_id": ref_doc["user_id"]}, {"_id": 0})
+    if referrer_user:
+        await db.user_notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": ref_doc["user_id"],
+            "type": "referral",
+            "title": f"{user.name} s-a inscris cu codul tau!",
+            "message": f"Vei primi {REFERRAL_BONUS_POINTS} puncte cand {user.name} plaseaza prima comanda.",
+            "is_read": False,
+            "created_at": datetime.now(timezone.utc)
+        })
+    
+    return {
+        "message": f"Cod aplicat! Ai primit {REFERRAL_WELCOME_POINTS} puncte de bun-venit!",
+        "points_awarded": REFERRAL_WELCOME_POINTS
+    }
+
+@api_router.get("/referral/leaderboard")
+async def get_referral_leaderboard():
+    """Get top referrers leaderboard"""
+    top = await db.referrals.find(
+        {"total_referrals": {"$gt": 0}},
+        {"_id": 0}
+    ).sort("total_referrals", -1).to_list(20)
+    
+    result = []
+    for i, entry in enumerate(top):
+        user_doc = await db.users.find_one(
+            {"user_id": entry["user_id"]},
+            {"_id": 0, "name": 1, "picture": 1}
+        )
+        if user_doc:
+            result.append({
+                "rank": i + 1,
+                "name": user_doc.get("name", "Anonim"),
+                "picture": user_doc.get("picture"),
+                "total_referrals": entry.get("total_referrals", 0),
+                "total_points_earned": entry.get("total_points_earned", 0),
+            })
+    return result
+
+# ==================== DEV AUTH (Quick Login for Testing) ====================
+
+class DevLoginRequest(BaseModel):
+    email: str
+    name: str
+    role: str = "user"  # "admin" or "user"
+
+@api_router.post("/auth/dev-login")
+async def dev_login(data: DevLoginRequest, response: Response):
+    """Quick dev login for testing - creates or finds user and returns session"""
+    # Check if user exists
+    existing_user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    
+    if existing_user:
+        user_id = existing_user["user_id"]
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        new_user = {
+            "user_id": user_id,
+            "email": data.email,
+            "name": data.name,
+            "picture": None,
+            "phone": None,
+            "address": None,
+            "is_company": False,
+            "company_id": None,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.users.insert_one(new_user)
+    
+    # Create session
+    session_token = f"dev_{uuid.uuid4().hex}"
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "user_id": user_id,
+        "session_token": session_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc)
+    })
+    
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=7 * 24 * 60 * 60
+    )
+    
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"user": user, "session_token": session_token}
+
 # ==================== BASIC ROUTES ====================
 
 @api_router.get("/")
