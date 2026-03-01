@@ -48,6 +48,7 @@ const EXCLUSIVE_SUBCATEGORIES = [
 export default function AcasaScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const cartItemCount = useCartStore((s) => s.items.reduce((sum, item) => sum + item.quantity, 0));
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -260,9 +261,9 @@ export default function AcasaScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.cartHeaderBtn} onPress={() => router.push('/cart')} data-testid="main-cart-btn">
             <Ionicons name="cart-outline" size={24} color={COLORS.text} />
-            {useCartStore.getState().getItemCount() > 0 && (
+            {cartItemCount > 0 && (
               <View style={styles.cartHeaderBadge}>
-                <Text style={styles.cartHeaderBadgeText}>{useCartStore.getState().getItemCount()}</Text>
+                <Text style={styles.cartHeaderBadgeText}>{cartItemCount}</Text>
               </View>
             )}
           </TouchableOpacity>
