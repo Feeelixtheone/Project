@@ -12,6 +12,8 @@ import uuid
 import re
 from datetime import datetime, timezone, timedelta
 import httpx
+import random
+import string
 
 # Stripe integration
 from emergentintegrations.payments.stripe.checkout import (
