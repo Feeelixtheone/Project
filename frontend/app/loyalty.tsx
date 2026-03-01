@@ -293,11 +293,11 @@ export default function LoyaltyScreen() {
                 <View style={styles.codeActions}>
                   <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode} data-testid="referral-copy-btn">
                     <Ionicons name={copied ? 'checkmark-circle' : 'copy-outline'} size={16} color={copied ? '#4ade80' : '#fff'} />
-                    <Text style={[styles.copyBtnText, copied && { color: '#4ade80' }]}>{copied ? 'Copiat!' : 'Copiaza codul'}</Text>
+                    <Text style={[styles.copyBtnText, copied && { color: '#4ade80' }]}>{copied ? 'Copiat!' : 'Copiaza'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.shareBtn} onPress={handleShareCode} data-testid="referral-share-btn">
                     <Ionicons name="share-social-outline" size={16} color="#fff" />
-                    <Text style={styles.shareBtnText}>Trimite</Text>
+                    <Text style={styles.shareBtnText}>Distribuie</Text>
                   </TouchableOpacity>
                 </View>
               </View>
