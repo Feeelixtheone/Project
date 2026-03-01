@@ -49,13 +49,16 @@ export default function WelcomeScreen() {
       const result = await devLogin(email, name, role);
       if (result.session_token) {
         await AsyncStorage.setItem('session_token', result.session_token);
-        await refreshUser();
-        router.replace('/(tabs)/acasa');
+        // Force a full reload to pick up the new session
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        } else {
+          router.replace('/(tabs)/acasa');
+        }
       }
     } catch (error: any) {
       const msg = error.message || 'Eroare la autentificare';
       Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
-    } finally {
       setDevLoginLoading(null);
     }
   };
