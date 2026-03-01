@@ -285,3 +285,17 @@ export const getLoyaltyLeaderboard = () =>
 // Push Tokens
 export const registerPushToken = (token: string) =>
   apiRequest<any>(`/api/push-tokens/register?token=${encodeURIComponent(token)}`, { method: 'POST' });
+
+// Referral System
+export const getMyReferralCode = () =>
+  apiRequest<any>('/api/referral/my-code');
+
+export const applyReferralCode = (code: string) =>
+  apiRequest<any>(`/api/referral/apply?code=${encodeURIComponent(code)}`, { method: 'POST' });
+
+export const getReferralLeaderboard = () =>
+  apiRequest<any[]>('/api/referral/leaderboard');
+
+// Dev Auth (Quick Login)
+export const devLogin = (email: string, name: string, role: string = 'user') =>
+  apiRequest<any>('/api/auth/dev-login', { method: 'POST', body: { email, name, role } });
