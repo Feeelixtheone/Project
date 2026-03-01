@@ -68,6 +68,7 @@ export default function AdminDashboard() {
       
       if (adminCheck.is_admin) {
         await loadData();
+        loadROTW();
       }
     } catch (error) {
       setIsAdmin(false);
