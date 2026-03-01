@@ -261,3 +261,27 @@ export const getUserNotifications = () =>
 
 export const markUserNotificationsRead = () =>
   apiRequest<any>('/api/user/notifications/read-all', { method: 'PUT' });
+
+// Restaurant of the Week
+export const getRestaurantOfTheWeek = () =>
+  apiRequest<any>('/api/restaurant-of-the-week');
+
+export const autoSelectROTW = () =>
+  apiRequest<any>('/api/admin/restaurant-of-the-week/auto-select', { method: 'POST' });
+
+export const manualSelectROTW = (restaurantId: string) =>
+  apiRequest<any>(`/api/admin/restaurant-of-the-week/manual?restaurant_id=${restaurantId}`, { method: 'POST' });
+
+// Loyalty Points
+export const getMyLoyaltyPoints = () =>
+  apiRequest<any>('/api/loyalty/my-points');
+
+export const awardLoyaltyPoints = (orderId: string, amount: number, restaurantName: string) =>
+  apiRequest<any>(`/api/loyalty/award-points?order_id=${orderId}&amount=${amount}&restaurant_name=${encodeURIComponent(restaurantName)}`, { method: 'POST' });
+
+export const getLoyaltyLeaderboard = () =>
+  apiRequest<any[]>('/api/loyalty/leaderboard');
+
+// Push Tokens
+export const registerPushToken = (token: string) =>
+  apiRequest<any>(`/api/push-tokens/register?token=${encodeURIComponent(token)}`, { method: 'POST' });
