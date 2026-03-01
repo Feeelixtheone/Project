@@ -2368,6 +2368,7 @@ async def create_direct_order(
         "created_at": datetime.now(timezone.utc)
     }
     await db.orders.insert_one(order)
+    order.pop("_id", None)
     
     # Send notification to restaurant
     await create_restaurant_notification(
