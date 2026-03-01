@@ -161,6 +161,49 @@ export default function WelcomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Dev Quick Login Accounts */}
+      <View style={styles.devSection}>
+        <Text style={styles.devTitle}>Conturi de test</Text>
+        <View style={styles.devAccounts}>
+          <TouchableOpacity
+            style={[styles.devAccountBtn, styles.devAdminBtn]}
+            onPress={() => handleDevLogin('mutinyretreat37@gmail.com', 'Admin Principal', 'admin')}
+            disabled={devLoginLoading !== null}
+            data-testid="dev-login-admin"
+          >
+            {devLoginLoading === 'mutinyretreat37@gmail.com' ? (
+              <ActivityIndicator size="small" color="#0A0A0A" />
+            ) : (
+              <>
+                <Ionicons name="shield-checkmark" size={18} color="#0A0A0A" />
+                <View>
+                  <Text style={styles.devAccountName}>Admin</Text>
+                  <Text style={styles.devAccountEmail}>mutinyretreat37@gmail.com</Text>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.devAccountBtn}
+            onPress={() => handleDevLogin('test.user@restaurant.ro', 'Test User', 'user')}
+            disabled={devLoginLoading !== null}
+            data-testid="dev-login-user"
+          >
+            {devLoginLoading === 'test.user@restaurant.ro' ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <>
+                <Ionicons name="person" size={18} color={COLORS.primary} />
+                <View>
+                  <Text style={styles.devAccountNameLight}>Utilizator Test</Text>
+                  <Text style={styles.devAccountEmailLight}>test.user@restaurant.ro</Text>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Support Info */}
       <View style={styles.supportSection}>
         <Text style={styles.supportTitle}>Ai nevoie de ajutor?</Text>
