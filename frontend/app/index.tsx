@@ -27,6 +27,8 @@ export default function WelcomeScreen() {
   const { user, isLoading, login, isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
   const [authMode, setAuthMode] = useState<AuthMode>('welcome');
+  const [devLoginLoading, setDevLoginLoading] = useState<string | null>(null);
+  const { refreshUser } = useAuth();
   
   // Company registration form
   const [companyName, setCompanyName] = useState('');
