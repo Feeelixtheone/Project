@@ -156,19 +156,19 @@ export default function RestaurantDetailScreen() {
 
   const handleReservation = async () => {
     if (!reservationDate || !reservationTime) {
-      Alert.alert('Eroare', 'Completează data și ora');
+      Platform.OS === 'web' ? window.alert('Completează data și ora') : Alert.alert('Eroare', 'Completează data și ora');
       return;
     }
     
     if (!user) {
-      Alert.alert('Eroare', 'Trebuie să fii autentificat pentru a face o rezervare.');
+      Platform.OS === 'web' ? window.alert('Trebuie să fii autentificat pentru a face o rezervare.') : Alert.alert('Eroare', 'Trebuie să fii autentificat pentru a face o rezervare.');
       return;
     }
 
     setIsCreatingReservation(true);
     
     try {
-      const originUrl = BACKEND_URL || (typeof window !== 'undefined' ? window.location?.origin : '') || 'https://app.local';
+      const originUrl = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : BACKEND_URL || 'https://app.local';
       
       const reservationData = {
         restaurant_id: id,
@@ -185,28 +185,26 @@ export default function RestaurantDetailScreen() {
       
       // Open Stripe checkout
       if (result.payment?.checkout_url) {
-        const supported = await Linking.canOpenURL(result.payment.checkout_url);
-        if (supported) {
-          await Linking.openURL(result.payment.checkout_url);
+        if (typeof window !== 'undefined') {
+          window.location.href = result.payment.checkout_url;
         } else {
-          // For web, try to open in new tab
-          if (typeof window !== 'undefined') {
-            window.open(result.payment.checkout_url, '_blank');
-          } else {
-            Alert.alert('Eroare', 'Nu se poate deschide pagina de plată.');
+          const supported = await Linking.canOpenURL(result.payment.checkout_url);
+          if (supported) {
+            await Linking.openURL(result.payment.checkout_url);
           }
         }
       }
 
       setShowReservationModal(false);
-      Alert.alert('Succes', 'Rezervarea a fost creată! Vei fi redirecționat pentru plată.');
-      // Reset form
+      const msg = 'Rezervarea a fost creată! Vei fi redirecționat pentru plată.';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Succes', msg);
       setReservationDate('');
       setReservationTime('');
       setReservationGuests('2');
       setReservationNotes('');
     } catch (error: any) {
-      Alert.alert('Eroare', error.message || 'Nu s-a putut crea rezervarea');
+      const msg = error.message || 'Nu s-a putut crea rezervarea';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
     } finally {
       setIsCreatingReservation(false);
     }
