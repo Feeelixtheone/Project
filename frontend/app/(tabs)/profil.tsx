@@ -793,6 +793,22 @@ export default function ProfilScreen() {
                   </View>
                 </View>
 
+                {/* Ambiance Rating */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Ambianta</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setFeedbackAmbianceRating(star)}>
+                        <Ionicons
+                          name={star <= feedbackAmbianceRating ? 'star' : 'star-outline'}
+                          size={28}
+                          color={star <= feedbackAmbianceRating ? '#f59e0b' : COLORS.textMuted}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
                 {/* Comment */}
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Comentariu</Text>
