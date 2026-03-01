@@ -288,6 +288,38 @@ export default function AcasaScreen() {
         </View>
       </View>
 
+      {/* Restaurant of the Week Banner */}
+      {rotwData?.restaurant && (
+        <TouchableOpacity
+          style={styles.rotwBanner}
+          onPress={() => router.push(`/restaurant/${rotwData.restaurant_id}`)}
+          data-testid="rotw-banner"
+        >
+          <View style={styles.rotwBadgeContainer}>
+            <Ionicons name="trophy" size={20} color="#0A0A0A" />
+            <Text style={styles.rotwBadgeLabel}>RESTAURANTUL SAPTAMANII</Text>
+          </View>
+          <View style={styles.rotwContent}>
+            <Image source={{ uri: rotwData.restaurant.cover_image }} style={styles.rotwImage} />
+            <View style={styles.rotwInfo}>
+              <Text style={styles.rotwName}>{rotwData.restaurant_name}</Text>
+              <Text style={styles.rotwCuisine}>{rotwData.restaurant.cuisine_type}</Text>
+              <View style={styles.rotwDiscountRow}>
+                <View style={styles.rotwDiscountBadge}>
+                  <Ionicons name="pricetag" size={12} color="#0A0A0A" />
+                  <Text style={styles.rotwDiscountText}>-{rotwData.discount_percentage}%</Text>
+                </View>
+                <View style={styles.rotwRatingBadge}>
+                  <Ionicons name="star" size={12} color="#f59e0b" />
+                  <Text style={styles.rotwRatingText}>{rotwData.restaurant.rating?.toFixed(1)}</Text>
+                </View>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color={COLORS.gold} />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color={COLORS.textSecondary} />
