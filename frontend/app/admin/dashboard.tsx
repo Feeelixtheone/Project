@@ -456,6 +456,57 @@ export default function AdminDashboard() {
           </View>
         </View>
 
+        {/* Restaurant of the Week Management */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Restaurantul Săptămânii</Text>
+            <Ionicons name="trophy" size={20} color={COLORS.gold} />
+          </View>
+          {rotwData?.restaurant ? (
+            <View style={{ backgroundColor: COLORS.gold + '15', borderRadius: BORDER_RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.gold + '40' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+                <Ionicons name="trophy" size={24} color={COLORS.gold} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: FONTS.bold, fontSize: 16, color: COLORS.gold }}>{rotwData.restaurant_name}</Text>
+                  <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textSecondary }}>Discount: {rotwData.discount_percentage}% | {rotwData.reason}</Text>
+                  <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: COLORS.textMuted }}>Selectat: {rotwData.selected_by === 'auto' ? 'Automat' : 'Manual'}</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <Text style={{ fontFamily: FONTS.regular, fontSize: 14, color: COLORS.textMuted, marginBottom: SPACING.md }}>Niciun restaurant selectat</Text>
+          )}
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, { borderColor: COLORS.gold + '40' }]}
+              onPress={handleAutoSelectROTW}
+              disabled={rotwLoading}
+              data-testid="rotw-auto-select"
+            >
+              {rotwLoading ? <ActivityIndicator size="small" color={COLORS.gold} /> : <Ionicons name="flash" size={24} color={COLORS.gold} />}
+              <Text style={[styles.actionText, { color: COLORS.gold }]}>Auto-selectare</Text>
+            </TouchableOpacity>
+          </View>
+          {restaurants.length > 0 && (
+            <View style={{ marginTop: SPACING.md }}>
+              <Text style={{ fontFamily: FONTS.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: SPACING.sm }}>Selectare manuală:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {restaurants.slice(0, 10).map((r: any) => (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={{ backgroundColor: COLORS.surfaceLight, borderRadius: BORDER_RADIUS.md, padding: SPACING.sm, marginRight: SPACING.sm, minWidth: 120, alignItems: 'center' }}
+                    onPress={() => handleManualSelectROTW(r.id)}
+                    data-testid={`rotw-manual-${r.id}`}
+                  >
+                    <Text style={{ fontFamily: FONTS.medium, fontSize: 12, color: COLORS.text }} numberOfLines={1}>{r.name}</Text>
+                    <Text style={{ fontFamily: FONTS.regular, fontSize: 11, color: COLORS.textMuted }}>{r.rating?.toFixed(1)} /{r.review_count} rev.</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
         {/* Pending Companies */}
         {pendingCompanies.length > 0 && (
           <View style={styles.section}>
