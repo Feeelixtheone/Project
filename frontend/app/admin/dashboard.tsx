@@ -51,6 +51,10 @@ export default function AdminDashboard() {
   // CUI verification
   const [verifyCui, setVerifyCui] = useState('');
   const [cuiResult, setCuiResult] = useState<any>(null);
+  
+  // ROTW
+  const [rotwData, setRotwData] = useState<any>(null);
+  const [rotwLoading, setRotwLoading] = useState(false);
 
   useEffect(() => {
     checkAdminAndLoad();
