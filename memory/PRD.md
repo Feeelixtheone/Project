@@ -1,83 +1,80 @@
-# PRD - RestaurantApp
+# RestaurantApp - PRD
 
 ## Problem Statement
-Restaurant reservation/ordering platform with multiple bug fixes and feature additions needed.
+Romanian restaurant application with advanced features: Restaurant of the Week, favorites with push notifications, post-order rating/feedback system, cart badge fixes, payment fixes, and loyalty points system.
 
 ## Architecture
-- **Frontend**: Expo React Native (Web) - TypeScript
-- **Backend**: FastAPI (Python) 
-- **Database**: MongoDB
-- **Payments**: Stripe Checkout
-- **Auth**: Google OAuth (Emergent)
-
-## Core Requirements
-- Restaurant listing, search, filtering
-- Table/food-ready reservations with Stripe payment
-- Cart-based ordering with direct Stripe checkout
-- Company registration with ANAF CUI verification
-- Admin panel for managing companies and restaurants
-- Notification system for restaurant owners
-- Receipt generation based on company CUI
-- 2.7% commission deducted from restaurant payout (NOT charged to user)
-
-## What's Been Implemented (2026-02-26)
-
-### Bug Fixes (P0)
-1. **Cancel reservation 1h before** - Fixed Platform.OS web compatibility for Alert dialogs
-2. **Cart not showing items** - Rewrote cartStore without AsyncStorage persist (web incompatible), simplified zustand store
-3. **Cart payment** - Cart now directly creates Stripe checkout via /api/orders/create
-4. **Trash button / Clear all button** - Replaced window.confirm with React Modal confirmation dialog
-5. **Anulează rezervarea button** - Replaced window.confirm/window.alert with React Modal-based confirmation and error dialogs
-6. **Commission 2.7%** - Updated from 1.7% to 2.7% in all frontend displays
-7. **User NOT paying commission** - Fixed: user pays base amount only, commission deducted from restaurant payout
-8. **20 RON fixed price** - Button now shows actual amount: "Plătește X.XX RON" based on selected items or "Plătește 20.00 RON (avans)" for table_only
-9. **Company registration broken** - Added registration modal in profile page with CUI, ANAF verification
-10. **Stripe checkout popup blocked** - Changed from window.open to window.location.href
-11. **Add to cart feedback** - Replaced window.confirm with visual toast notification banner
-
-### Iteration 2 Fixes (2026-02-26)
-- Replaced ALL window.confirm/window.alert with React Modal-based confirmations
-- Added Pressable components for better web click handling
-- Cart clear shows modal: "Golește coșul?"
-- Cancel reservation shows modal: "Anulează rezervarea?" with loading state
-- Error dialogs for "cannot cancel" shown as proper modals
-- Stripe checkout redirect changed from window.open to window.location.href
-- Reservation submit button shows actual price amount
-
-### Features Added (P1)
-1. **Notification system** - In-app notifications for restaurants on new orders/reservations/payments
-2. **Admin notifications** - Admin gets notified on new company registrations
-3. **Receipts based on CUI** - Auto-generated on payment confirmation via webhook
-4. **Company dashboard tabs** - Stores, Notifications, Orders, Receipts sections
-5. **Admin restaurant management** - View/delete all restaurants
-6. **Store product management** - Delete products from stores (company + admin)
-7. **ANAF CUI verification** - Integrated ANAF API for CUI validation during registration
-
-### Backend Routes Added
-- GET /api/notifications/company
-- PUT /api/notifications/{id}/read
-- PUT /api/notifications/mark-all-read
-- GET /api/receipts/company
-- GET /api/admin/notifications
-- PUT /api/admin/notifications/{id}/read
-- GET /api/admin/restaurants
-- DELETE /api/admin/restaurants/{id}
-- DELETE /api/admin/restaurants/{id}/products/{product_id}
-- GET /api/admin/orders
-- GET /api/admin/reservations
-- DELETE /api/stores/{store_id}/products/{product_id}
-- GET /api/stores/{store_id}/products
-- GET /api/stores/{store_id}/orders
+- **Frontend**: React Native (Expo) with expo-router, Zustand for state management
+- **Backend**: FastAPI (Python) with MongoDB (Motor async driver)
+- **Auth**: Google OAuth via Emergent-managed authentication
+- **Payments**: Stripe integration (test mode)
+- **Theme**: Dark mode with Montserrat font, orange primary color
 
 ## User Personas
-1. **Client** - Browses restaurants, makes reservations, orders food
-2. **Restaurant Owner** - Manages restaurant, views orders/notifications/receipts
-3. **Admin** - Verifies companies, manages all restaurants, views stats
+1. **Regular User**: Browse restaurants, order food, earn loyalty points, leave feedback
+2. **Admin** (mutinyretreat37@gmail.com): Manage ROTW, view dashboards, manage companies
+3. **Restaurant Owner**: Manage restaurant, view orders, respond to feedback
 
-## Backlog
-- P0: None remaining
-- P1: Email notification to admin on company registration (currently in-app only)
-- P2: Push notifications for mobile
-- P2: Receipt PDF download
-- P2: Advanced order status management (kitchen flow)
-- P3: Real-time order tracking with WebSockets
+## Core Requirements (Static)
+- Restaurant browsing with categories and search
+- Cart & direct ordering with Stripe payment
+- Table reservations
+- Favorites with notifications
+- Restaurant of the Week with 10% discount
+- Loyalty points system (1 pt/RON)
+- Post-order feedback (food, service, ambiance ratings)
+- Admin dashboard with ROTW management
+
+## What's Been Implemented (March 1, 2026)
+
+### Bug Fixes
+- **Cart Badge**: Fixed cart icon in main header (acasa.tsx) to show reactive item count badge using Zustand store subscription
+- **Payment Error**: Fixed corrupted STRIPE_API_KEY in backend .env; Fixed ObjectId serialization issue in createDirectOrder endpoint
+- **Origin URL**: Fixed origin_url construction in cart.tsx for Stripe redirect
+
+### New Features
+1. **Restaurant of the Week (ROTW)**:
+   - Backend: Auto-select (60% rating, 40% orders weighted), manual admin select, 10% discount
+   - Frontend: Golden banner on home page, ROTW badge on restaurant cards, discounted prices on detail page
+   - Admin dashboard: ROTW management section with auto/manual selection
+
+2. **Loyalty Points System**:
+   - Backend: Points awarded on order completion (1 pt/RON), levels (Bronze/Silver/Gold/Platinum)
+   - Frontend: Dedicated /loyalty page with overview, progress, level tiers, history, leaderboard
+   - Auto-award on Stripe webhook payment confirmation
+
+3. **Enhanced Feedback System**:
+   - Added ambiance rating (1-5 stars) to feedback form
+   - Backend already supported ambiance_rating field
+
+4. **Profile Enhancement**:
+   - Added loyalty points quick access card in profile tab
+
+## Prioritized Backlog
+
+### P0 (Critical)
+- [x] Fix cart badge on main header
+- [x] Fix payment error from cart
+- [x] Restaurant of the Week system
+
+### P1 (High)
+- [x] Loyalty points E2E (order -> points awarded)
+- [ ] Real push notifications (Expo Push Notifications integration)
+- [ ] Verify push token registration flow
+
+### P2 (Medium)
+- [x] Gamification/Leaderboard for loyalty points
+- [ ] Points redemption for discounts
+- [ ] Monthly/Weekly leaderboard reset options
+
+### P3 (Nice to Have)
+- [ ] Push notification preferences per user
+- [ ] Social sharing of achievements
+- [ ] Loyalty point transfer between users
+- [ ] Seasonal ROTW badges/themes
+
+## Next Tasks
+1. Integrate Expo Push Notifications for real push delivery
+2. Add points redemption flow (e.g., 100 points = 10 RON discount)
+3. Add push notification preferences in settings
+4. Test complete E2E flow with admin account (ROTW selection -> discount applied -> order -> points awarded)
