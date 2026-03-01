@@ -178,14 +178,20 @@ export default function ProfilScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Deconectare',
-      'Ești sigur că vrei să te deconectezi?',
-      [
-        { text: 'Nu', style: 'cancel' },
-        { text: 'Da', onPress: logout },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm('Ești sigur că vrei să te deconectezi?')) {
+        logout();
+      }
+    } else {
+      Alert.alert(
+        'Deconectare',
+        'Ești sigur că vrei să te deconectezi?',
+        [
+          { text: 'Nu', style: 'cancel' },
+          { text: 'Da', onPress: logout },
+        ]
+      );
+    }
   };
 
   const tabs: { key: TabType; label: string; icon: string }[] = [
