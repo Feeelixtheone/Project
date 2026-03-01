@@ -180,11 +180,13 @@ export default function AcasaScreen() {
 
   const renderRestaurantCard = ({ item }: { item: any }) => {
     const isExclusive = item.categories?.includes('exclusive');
+    const isROTW = rotwData?.restaurant_id === item.id;
     return (
     <TouchableOpacity
       style={[
         styles.restaurantCard,
         isExclusive && styles.restaurantCardExclusive,
+        isROTW && styles.restaurantCardROTW,
       ]}
       onPress={() => router.push(`/restaurant/${item.id}`)}
       activeOpacity={0.9}
@@ -197,8 +199,16 @@ export default function AcasaScreen() {
       <View style={styles.imageContainer}>
         <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
         
+        {/* ROTW Badge */}
+        {isROTW && (
+          <View style={styles.rotwCardBadge}>
+            <Ionicons name="trophy" size={12} color="#0A0A0A" />
+            <Text style={styles.rotwCardBadgeText}>-10%</Text>
+          </View>
+        )}
+        
         {/* Exclusive Badge */}
-        {isExclusive && (
+        {isExclusive && !isROTW && (
           <View style={styles.exclusiveBadge}>
             <Ionicons name="diamond" size={12} color={COLORS.background} />
             <Text style={styles.exclusiveBadgeText}>EXCLUSIVE</Text>
