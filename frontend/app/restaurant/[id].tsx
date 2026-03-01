@@ -285,7 +285,14 @@ export default function RestaurantDetailScreen() {
           )}
           <View style={styles.menuItemFooter}>
             <Text style={styles.menuItemQuantity}>{item.quantity}</Text>
-            <Text style={styles.menuItemPrice}>{item.price.toFixed(2)} RON</Text>
+            {isROTW ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textMuted, textDecorationLine: 'line-through' }}>{item.price.toFixed(2)}</Text>
+                <Text style={[styles.menuItemPrice, { color: COLORS.gold }]}>{(item.price * (1 - rotwDiscount / 100)).toFixed(2)} RON</Text>
+              </View>
+            ) : (
+              <Text style={styles.menuItemPrice}>{item.price.toFixed(2)} RON</Text>
+            )}
           </View>
           <TouchableOpacity style={styles.addToCartBtn} onPress={(e) => { e.stopPropagation && e.stopPropagation(); handleAddToCart(item); }}>
             <Ionicons name="cart" size={16} color={COLORS.text} />
