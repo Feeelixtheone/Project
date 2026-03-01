@@ -890,6 +890,12 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: SPACING.lg,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
   sectionTitle: {
     fontFamily: FONTS.semiBold,
     fontSize: 18,
