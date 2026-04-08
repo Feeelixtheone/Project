@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '../../src/constants/theme';
-import { getRestaurant, getReviews, createReview, createReservationWithPayment, toggleLike, checkLiked, toggleFavorite, checkFavorite, getRestaurantOffers, getRestaurantFeedback, getRestaurantOfTheWeek } from '../../src/utils/api';
+import { getRestaurant, getReviews, createReview, createReservationWithPayment, toggleLike, checkLiked, toggleFavorite, checkFavorite, getRestaurantOffers, getRestaurantFeedback, getRestaurantOfTheWeek, apiRequest } from '../../src/utils/api';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCartStore } from '../../src/stores/cartStore';
 import { DatePicker, TimePicker } from '../../src/components/DateTimePicker';
@@ -73,10 +73,30 @@ export default function RestaurantDetailScreen() {
   // Add to cart toast
   const [addedToCartMsg, setAddedToCartMsg] = useState('');
 
+  // Floor plan
+  const [floorPlan, setFloorPlan] = useState<any>(null);
+  const [showTablePhotoModal, setShowTablePhotoModal] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<any>(null);
+
   useEffect(() => {
     loadData();
     getLocation();
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadFloorPlan();
+    }
+  }, [id]);
+
+  const loadFloorPlan = async () => {
+    try {
+      const fp = await apiRequest<any>(`/api/restaurants/${id}/floorplan`);
+      setFloorPlan(fp);
+    } catch (e) {
+      // No floor plan available
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -348,7 +368,65 @@ export default function RestaurantDetailScreen() {
 
   const renderGalleryContent = () => {
     if (viewMode === '2d') {
-      // 2D Images - interior images
+      // Interactive 2D Floor Plan
+      if (floorPlan && floorPlan.image_url) {
+        return (
+          <View style={styles.floorPlanContainer}>
+            <Text style={styles.floorPlanTitle}>Plan 2D - Apasă pe o masă</Text>
+            <View style={styles.floorPlanWrapper}>
+              <Image
+                source={{ uri: floorPlan.image_url }}
+                style={styles.floorPlanImage}
+                resizeMode="contain"
+              />
+              {/* Table Markers */}
+              {(floorPlan.tables || []).map((table: any, index: number) => (
+                <Pressable
+                  key={`table-${table.table_number}-${index}`}
+                  onPress={() => {
+                    setSelectedTable(table);
+                    if (table.photo_url) {
+                      setShowTablePhotoModal(true);
+                    }
+                  }}
+                  style={[
+                    styles.tableMarker,
+                    {
+                      left: `${table.x}%` as any,
+                      top: `${table.y}%` as any,
+                    },
+                    table.photo_url ? styles.tableMarkerWithPhoto : styles.tableMarkerEmpty,
+                  ]}
+                  data-testid={`table-marker-${table.table_number}`}
+                >
+                  <Text style={[
+                    styles.tableMarkerText,
+                    table.photo_url ? styles.tableMarkerTextActive : null
+                  ]}>
+                    {table.table_number}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.floorPlanHint}>
+              {floorPlan.tables?.filter((t: any) => t.photo_url).length || 0} mese cu fotografii disponibile
+            </Text>
+            {/* Business/Admin: Manage Floor Plan */}
+            {user && (user.is_company || user.email === 'mutinyretreat37@gmail.com') && (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.primary + '20', padding: 10, borderRadius: 8, marginTop: 8 }}
+                onPress={() => router.push(`/floorplan/${id}` as any)}
+                data-testid="manage-floorplan-btn"
+              >
+                <Ionicons name="settings" size={18} color={COLORS.primary} />
+                <Text style={{ fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.primary }}>Gestionează planul</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      }
+      
+      // Fallback to regular 2D images
       const images = restaurant.interior_images || [];
       if (images.length === 0) {
         return (
@@ -944,6 +1022,43 @@ export default function RestaurantDetailScreen() {
             style={styles.fullscreenImage}
             resizeMode="contain"
           />
+        </View>
+      </Modal>
+
+      {/* Table Photo Modal */}
+      <Modal
+        visible={showTablePhotoModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowTablePhotoModal(false)}
+      >
+        <View style={styles.fullscreenOverlay}>
+          <TouchableOpacity
+            style={styles.fullscreenCloseBtn}
+            onPress={() => setShowTablePhotoModal(false)}
+          >
+            <Ionicons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
+          {selectedTable && (
+            <View style={styles.tablePhotoModalContent}>
+              <View style={styles.tablePhotoHeader}>
+                <Ionicons name="restaurant" size={20} color={COLORS.primary} />
+                <Text style={styles.tablePhotoTitle}>Masa {selectedTable.table_number}</Text>
+              </View>
+              {selectedTable.photo_url ? (
+                <Image
+                  source={{ uri: selectedTable.photo_url }}
+                  style={styles.tablePhotoImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.tablePhotoEmpty}>
+                  <Ionicons name="camera-outline" size={48} color={COLORS.textMuted} />
+                  <Text style={styles.tablePhotoEmptyText}>Nu există fotografie pentru această masă</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -1750,5 +1865,99 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.primary,
     marginTop: 4,
+  },
+  // Floor Plan Styles
+  floorPlanContainer: {
+    padding: SPACING.sm,
+  },
+  floorPlanTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 16,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  floorPlanWrapper: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surfaceLight,
+  },
+  floorPlanImage: {
+    width: '100%',
+    height: '100%',
+  },
+  tableMarker: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -14,
+    marginTop: -14,
+    zIndex: 10,
+  },
+  tableMarkerWithPhoto: {
+    backgroundColor: COLORS.primary + 'DD',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  tableMarkerEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  tableMarkerText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9,
+    color: COLORS.textMuted,
+  },
+  tableMarkerTextActive: {
+    color: '#fff',
+  },
+  floorPlanHint: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
+  // Table Photo Modal
+  tablePhotoModalContent: {
+    width: width * 0.9,
+    maxHeight: height * 0.8,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+  },
+  tablePhotoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  tablePhotoTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    color: COLORS.text,
+  },
+  tablePhotoImage: {
+    width: '100%',
+    height: width * 0.7,
+  },
+  tablePhotoEmpty: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  tablePhotoEmptyText: {
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: COLORS.textMuted,
   },
 });

@@ -16,6 +16,8 @@ import random
 import string
 import bcrypt
 import jwt as pyjwt
+import base64
+import json
 
 # Stripe integration
 from emergentintegrations.payments.stripe.checkout import (
@@ -4047,6 +4049,158 @@ async def get_referral_leaderboard():
             })
     return result
 
+
+# ==================== FLOOR PLAN (2D) FEATURE ====================
+
+class TablePosition(BaseModel):
+    table_number: str
+    x: float  # percentage 0-100
+    y: float  # percentage 0-100
+    photo_url: Optional[str] = None
+
+class FloorPlanCreate(BaseModel):
+    image_url: str
+    tables: List[TablePosition] = []
+
+class TablePhotoAssign(BaseModel):
+    table_number: str
+    photo_url: str
+
+@api_router.get("/restaurants/{restaurant_id}/floorplan")
+async def get_floor_plan(restaurant_id: str):
+    """Get restaurant floor plan with table positions and photos"""
+    floor_plan = await db.floor_plans.find_one(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    )
+    if not floor_plan:
+        raise HTTPException(status_code=404, detail="Planul restaurantului nu a fost găsit")
+    return floor_plan
+
+@api_router.post("/restaurants/{restaurant_id}/floorplan")
+async def save_floor_plan(restaurant_id: str, data: FloorPlanCreate, user: User = Depends(require_auth)):
+    """Save or update restaurant floor plan"""
+    # Verify restaurant exists
+    restaurant = await db.restaurants.find_one({"id": restaurant_id})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurantul nu a fost găsit")
+    
+    tables_data = [t.dict() for t in data.tables]
+    
+    await db.floor_plans.update_one(
+        {"restaurant_id": restaurant_id},
+        {"$set": {
+            "restaurant_id": restaurant_id,
+            "image_url": data.image_url,
+            "tables": tables_data,
+            "updated_at": datetime.now(timezone.utc),
+            "updated_by": user.user_id
+        }},
+        upsert=True
+    )
+    return {"message": "Planul a fost salvat", "tables_count": len(tables_data)}
+
+@api_router.post("/restaurants/{restaurant_id}/floorplan/table-photo")
+async def assign_table_photo(restaurant_id: str, data: TablePhotoAssign, user: User = Depends(require_auth)):
+    """Assign a photo to a specific table"""
+    result = await db.floor_plans.update_one(
+        {"restaurant_id": restaurant_id, "tables.table_number": data.table_number},
+        {"$set": {"tables.$.photo_url": data.photo_url}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Masa nu a fost găsită")
+    return {"message": f"Fotografia a fost atribuită mesei {data.table_number}"}
+
+@api_router.post("/restaurants/{restaurant_id}/floorplan/ai-detect")
+async def ai_detect_tables(restaurant_id: str, user: User = Depends(require_auth)):
+    """Use AI to detect table numbers from floor plan image"""
+    floor_plan = await db.floor_plans.find_one(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    )
+    if not floor_plan or not floor_plan.get("image_url"):
+        raise HTTPException(status_code=404, detail="Încărcați mai întâi o imagine a planului")
+    
+    image_url = floor_plan["image_url"]
+    
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        import httpx as hx
+        
+        llm_key = os.environ.get("EMERGENT_LLM_KEY")
+        if not llm_key:
+            raise HTTPException(status_code=500, detail="Cheia AI nu este configurată")
+        
+        # Download the image and convert to base64
+        async with hx.AsyncClient() as client:
+            img_resp = await client.get(image_url, timeout=30)
+            img_base64 = base64.b64encode(img_resp.content).decode("utf-8")
+        
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=f"floorplan_{restaurant_id}_{uuid.uuid4().hex[:8]}",
+            system_message="You are a floor plan analyzer. Your job is to detect numbered tables in restaurant floor plan images. Return ONLY valid JSON."
+        )
+        chat.with_model("openai", "gpt-4o")
+        
+        image_content = ImageContent(image_base64=img_base64)
+        
+        user_msg = UserMessage(
+            text="""Analyze this restaurant floor plan image. Find ALL numbered tables visible in the image.
+For each table, provide:
+- table_number: the number visible on the table (as a string)
+- x: approximate horizontal position as percentage (0=left, 100=right)
+- y: approximate vertical position as percentage (0=top, 100=bottom)
+
+Return ONLY a JSON array like: [{"table_number": "1", "x": 50, "y": 30}, ...]
+No explanation, just the JSON array.""",
+            file_contents=[image_content]
+        )
+        
+        response = await chat.send_message(user_msg)
+        
+        # Parse the response
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            response_text = response_text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        
+        tables = json.loads(response_text)
+        
+        # Keep existing photo assignments
+        existing_tables = {t["table_number"]: t.get("photo_url") for t in floor_plan.get("tables", [])}
+        for table in tables:
+            if table["table_number"] in existing_tables and existing_tables[table["table_number"]]:
+                table["photo_url"] = existing_tables[table["table_number"]]
+            else:
+                table["photo_url"] = None
+        
+        # Save detected tables
+        await db.floor_plans.update_one(
+            {"restaurant_id": restaurant_id},
+            {"$set": {"tables": tables, "updated_at": datetime.now(timezone.utc)}}
+        )
+        
+        return {"tables": tables, "count": len(tables)}
+        
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="AI nu a putut detecta mesele. Încercați din nou.")
+    except Exception as e:
+        logger.error(f"AI detection error: {e}")
+        raise HTTPException(status_code=500, detail=f"Eroare AI: {str(e)}")
+
+@api_router.post("/upload/image-url")
+async def upload_image_url(request: Request, user: User = Depends(require_auth)):
+    """Accept a base64 image and return a URL (stores as data URI for now)"""
+    body = await request.json()
+    image_data = body.get("image_data")
+    mime_type = body.get("mime_type", "image/png")
+    
+    if not image_data:
+        raise HTTPException(status_code=400, detail="Lipsesc datele imaginii")
+    
+    # Store as data URI - in production, upload to cloud storage
+    data_uri = f"data:{mime_type};base64,{image_data}"
+    return {"url": data_uri}
+
+
 # ==================== ADMIN KILL SWITCH ====================
 
 @api_router.get("/app/status")
@@ -4246,6 +4400,105 @@ async def startup_seed():
         # Create indexes
         await db.users.create_index("email", unique=True)
         await db.users.create_index("user_id", unique=True)
+        
+        # Seed "Hamza" restaurant from Sibiu with floor plan
+        hamza_id = "rest_hamza_sibiu"
+        existing_hamza = await db.restaurants.find_one({"id": hamza_id})
+        if not existing_hamza:
+            await db.restaurants.insert_one({
+                "id": hamza_id,
+                "name": "Hamza",
+                "description": "Restaurant de lux în Sibiu cu atmosferă unică și bucătărie internațională. Experiență culinară de top cu o vedere spectaculoasă.",
+                "address": "Str. Nicolae Bălcescu 15, Sibiu",
+                "phone": "+40 269 123 456",
+                "cuisine_type": "Internațional",
+                "categories": ["Exclusive", "Aperitive"],
+                "price_range": "$$$",
+                "opening_hours": "12:00 - 00:00",
+                "rating": 4.8,
+                "review_count": 156,
+                "cover_image": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg",
+                "image_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg",
+                "interior_images": [
+                    "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg",
+                    "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg",
+                    "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"
+                ],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7983,
+                "longitude": 24.1256,
+                "is_exclusive": True,
+                "is_sponsored": False,
+                "is_new": True,
+                "is_3d": True,
+                "has_floor_plan": True,
+                "likes": 420,
+                "created_at": datetime.now(timezone.utc),
+                "owner_user_id": None,
+                "company_id": None,
+                "menu": [
+                    {"id": "m1", "name": "Tartare de vită", "price": 55.0, "quantity": "200g", "description": "Cu avocado și chips de parmezan", "category": "Aperitive", "image_url": "https://images.unsplash.com/photo-1625943553852-781c6dd46faa?w=400"},
+                    {"id": "m2", "name": "Risotto cu trufe", "price": 72.0, "quantity": "350g", "description": "Cu parmezan maturat 24 luni", "category": "Paste", "image_url": "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400"},
+                    {"id": "m3", "name": "Antricot Black Angus", "price": 120.0, "quantity": "400g", "description": "Maturat 28 zile, cu garnitură de sezon", "category": "Principale", "image_url": "https://images.unsplash.com/photo-1558030006-450675393462?w=400"},
+                    {"id": "m4", "name": "Cheesecake cu fructe de pădure", "price": 35.0, "quantity": "1 porție", "description": "Făcut în casă zilnic", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1508737027454-e6454ef45afd?w=400"},
+                ]
+            })
+            logger.info("Hamza restaurant seeded")
+        
+        # Seed floor plan for Hamza
+        existing_fp = await db.floor_plans.find_one({"restaurant_id": hamza_id})
+        if not existing_fp:
+            hamza_tables = [
+                {"table_number": "1", "x": 57, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "3", "x": 63, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "5", "x": 69, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "9", "x": 82, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "8", "x": 82, "y": 20, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "5b", "x": 82, "y": 33, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "6", "x": 82, "y": 43, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "11", "x": 65, "y": 22, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "12", "x": 58, "y": 22, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "14", "x": 62, "y": 38, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "15", "x": 55, "y": 38, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "17", "x": 62, "y": 50, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "18", "x": 55, "y": 50, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "30", "x": 70, "y": 57, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "35", "x": 57, "y": 57, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "22", "x": 74, "y": 67, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "23", "x": 67, "y": 67, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "24", "x": 60, "y": 67, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "26", "x": 75, "y": 78, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "27", "x": 67, "y": 78, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "31", "x": 38, "y": 15, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "33", "x": 47, "y": 25, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "34", "x": 47, "y": 35, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "36", "x": 47, "y": 55, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "37", "x": 38, "y": 55, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "38", "x": 47, "y": 63, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "39", "x": 38, "y": 63, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "40", "x": 47, "y": 72, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "41", "x": 38, "y": 72, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "44", "x": 18, "y": 22, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "45", "x": 18, "y": 30, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "46", "x": 18, "y": 38, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "47", "x": 18, "y": 46, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "48", "x": 18, "y": 55, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "49", "x": 18, "y": 63, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "50", "x": 18, "y": 71, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "51", "x": 18, "y": 79, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+                {"table_number": "52", "x": 18, "y": 87, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
+                {"table_number": "91", "x": 35, "y": 48, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
+                {"table_number": "888", "x": 28, "y": 40, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
+            ]
+            await db.floor_plans.insert_one({
+                "restaurant_id": hamza_id,
+                "image_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/o5ayyvch_image.png",
+                "tables": hamza_tables,
+                "updated_at": datetime.now(timezone.utc)
+            })
+            logger.info("Hamza floor plan seeded")
         
     except Exception as e:
         logger.error(f"Startup seed error: {e}")
