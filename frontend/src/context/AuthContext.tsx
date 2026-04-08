@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
 
@@ -14,6 +12,9 @@ interface User {
   picture?: string;
   phone?: string;
   address?: string;
+  is_company?: boolean;
+  company_id?: string;
+  role?: string;
   created_at: string;
 }
 
@@ -21,7 +22,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string, accountType: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -33,78 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
-  // Check for existing session on mount
   useEffect(() => {
     checkExistingSession();
   }, []);
-
-  // Handle deep links for OAuth callback
-  useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      await processAuthRedirect(event.url);
-    };
-
-    // Check initial URL (cold start)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        processAuthRedirect(url);
-      }
-    });
-
-    // Listen for incoming links (hot link)
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  const processAuthRedirect = async (url: string) => {
-    try {
-      // Parse session_id from URL (support both hash and query)
-      let sessionId: string | null = null;
-      
-      if (url.includes('#session_id=')) {
-        sessionId = url.split('#session_id=')[1]?.split('&')[0];
-      } else if (url.includes('?session_id=')) {
-        sessionId = url.split('?session_id=')[1]?.split('&')[0];
-      }
-
-      if (sessionId) {
-        setIsLoading(true);
-        await exchangeSessionId(sessionId);
-      }
-    } catch (error) {
-      console.error('Error processing auth redirect:', error);
-      setIsLoading(false);
-    }
-  };
-
-  const exchangeSessionId = async (sessionId: string) => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-ID': sessionId,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        setSessionToken(data.session_token);
-        await AsyncStorage.setItem('session_token', data.session_token);
-        router.replace('/(tabs)/acasa');
-      } else {
-        console.error('Failed to exchange session ID');
-      }
-    } catch (error) {
-      console.error('Error exchanging session ID:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const checkExistingSession = async () => {
     try {
@@ -121,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = await response.json();
           setUser(userData);
         } else {
-          // Invalid session, clear it
           await AsyncStorage.removeItem('session_token');
           setSessionToken(null);
         }
@@ -133,32 +65,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async () => {
+  const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      
-      // Use platform-specific redirect URLs
-      const redirectUrl = Platform.OS === 'web'
-        ? `${BACKEND_URL}/`
-        : Linking.createURL('/');
-      
-      const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Eroare la autentificare' }));
+        throw new Error(typeof error.detail === 'string' ? error.detail : 'Email sau parolă greșită');
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      setSessionToken(data.session_token);
+      await AsyncStorage.setItem('session_token', data.session_token);
       
       if (Platform.OS === 'web') {
-        // Web: Direct redirect
-        window.location.href = authUrl;
+        window.location.href = '/';
       } else {
-        // Mobile: Use WebBrowser
-        const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-        
-        if (result.type === 'success' && result.url) {
-          await processAuthRedirect(result.url);
-        } else {
-          setIsLoading(false);
-        }
+        router.replace('/(tabs)/acasa');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (email: string, password: string, name: string, accountType: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, account_type: accountType }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Eroare la înregistrare' }));
+        throw new Error(typeof error.detail === 'string' ? error.detail : 'Nu s-a putut crea contul');
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      setSessionToken(data.session_token);
+      await AsyncStorage.setItem('session_token', data.session_token);
+      
+      if (Platform.OS === 'web') {
+        window.location.href = '/';
+      } else {
+        router.replace('/(tabs)/acasa');
+      }
+    } catch (error) {
+      throw error;
+    } finally {
       setIsLoading(false);
     }
   };
@@ -213,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        register,
         logout,
         refreshUser,
       }}

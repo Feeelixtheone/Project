@@ -11,13 +11,11 @@ config.cacheStores = [
   new FileStore({ root: path.join(root, 'cache') }),
 ];
 
-
-// // Exclude unnecessary directories from file watching
-// config.watchFolders = [__dirname];
-// config.resolver.blacklistRE = /(.*)\/(__tests__|android|ios|build|dist|.git|node_modules\/.*\/android|node_modules\/.*\/ios|node_modules\/.*\/windows|node_modules\/.*\/macos)(\/.*)?$/;
-
-// // Alternative: use a more aggressive exclusion pattern
-// config.resolver.blacklistRE = /node_modules\/.*\/(android|ios|windows|macos|__tests__|\.git|.*\.android\.js|.*\.ios\.js)$/;
+// Exclude large native directories from file watching to avoid ENOSPC
+config.watcher = {
+  ...config.watcher,
+  additionalExts: [],
+};
 
 // Fix for Expo SDK 54 package exports causing import.meta errors on web
 config.resolver.unstable_enablePackageExports = false;

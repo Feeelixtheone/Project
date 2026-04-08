@@ -7,16 +7,16 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Public endpoint from the frontend .env
-BACKEND_URL = "https://rating-feedback-hub.preview.emergentagent.com"
+BACKEND_URL = "https://watermark-removal-8.preview.emergentagent.com"
 
-class RestaurantAppAPITester:
+class WatermarkRemovalAPITester:
     def __init__(self):
         self.tests_run = 0
         self.tests_passed = 0
         self.session_token = None
         self.user_data = None
-        self.business_session_token = None
-        self.business_user_data = None
+        self.admin_email = "mutinyretreat37@gmail.com"
+        self.admin_password = "karaplange2"
         
     def log_test(self, test_name: str, success: bool, details: str = ""):
         self.tests_run += 1
@@ -59,81 +59,155 @@ class RestaurantAppAPITester:
         except Exception as e:
             return False, {"error": str(e)}, 0
 
-    def test_dev_login_admin(self):
-        """Test POST /api/auth/dev-login with admin email"""
+    def test_admin_login(self):
+        """Test POST /api/auth/login with admin credentials"""
         success, data, status = self.api_call(
             "POST", 
-            "/api/auth/dev-login",
+            "/api/auth/login",
             {
-                "email": "mutinyretreat37@gmail.com",
-                "name": "Admin Principal", 
-                "role": "admin"
+                "email": self.admin_email,
+                "password": self.admin_password
             }
         )
         
         if success and "session_token" in data and "user" in data:
             self.session_token = data["session_token"]
             self.user_data = data["user"]
-            self.log_test("Dev Login Admin", True, 
-                         f"Got session_token and user data: {data['user']['name']}")
+            # Verify admin role
+            if data["user"].get("role") == "admin" or data["user"].get("email") == self.admin_email:
+                self.log_test("Admin Login", True, 
+                             f"Admin logged in: {data['user']['name']} ({data['user']['email']})")
+                return True
+            else:
+                self.log_test("Admin Login", False, 
+                             f"User logged in but not admin role: {data['user']}")
+                return False
         else:
-            self.log_test("Dev Login Admin", False, 
+            self.log_test("Admin Login", False, 
                          f"Status: {status}, Response: {data}")
-        return success
+            return False
 
-    def test_dev_login_business(self):
-        """Test POST /api/auth/dev-login with business email"""
+    def test_user_register(self):
+        """Test POST /api/auth/register for new user"""
+        test_email = f"test_user_{datetime.now().strftime('%H%M%S')}@test.com"
         success, data, status = self.api_call(
             "POST", 
-            "/api/auth/dev-login",
+            "/api/auth/register",
             {
-                "email": "business@restaurant.ro",
-                "name": "Business Owner", 
-                "role": "user"
+                "email": test_email,
+                "password": "testpass123",
+                "name": "Test User",
+                "account_type": "user"
             }
         )
         
         if success and "session_token" in data and "user" in data:
-            self.business_session_token = data["session_token"]
-            self.business_user_data = data["user"]
-            self.log_test("Dev Login Business", True, 
-                         f"Got session_token and user data: {data['user']['name']}")
+            user = data["user"]
+            if user.get("email") == test_email and user.get("name") == "Test User":
+                self.log_test("User Register", True, 
+                             f"User registered: {user['name']} ({user['email']})")
+                return True
+            else:
+                self.log_test("User Register", False, 
+                             f"Registration successful but user data incorrect: {user}")
+                return False
         else:
-            self.log_test("Dev Login Business", False, 
+            self.log_test("User Register", False, 
                          f"Status: {status}, Response: {data}")
-        return success
+            return False
 
-    def test_auth_me_admin(self):
+    def test_auth_me(self):
         """Test GET /api/auth/me with admin session"""
         if not self.session_token:
-            self.log_test("Auth Me Admin", False, "No admin session token")
+            self.log_test("Auth Me", False, "No admin session token")
             return False
             
         success, data, status = self.api_call("GET", "/api/auth/me", token=self.session_token)
         
-        if success and "user_id" in data and data.get("email") == "mutinyretreat37@gmail.com":
-            self.log_test("Auth Me Admin", True, 
-                         f"Got user info: {data['name']} - {data['email']}")
+        if success and "user_id" in data and data.get("email") == self.admin_email:
+            self.log_test("Auth Me", True, 
+                         f"Got admin user info: {data['name']} - {data['email']}")
+            return True
         else:
-            self.log_test("Auth Me Admin", False, 
+            self.log_test("Auth Me", False, 
                          f"Status: {status}, Response: {data}")
-        return success
+            return False
 
-    def test_auth_me_business(self):
-        """Test GET /api/auth/me with business session"""
-        if not self.business_session_token:
-            self.log_test("Auth Me Business", False, "No business session token")
+    def test_app_status(self):
+        """Test GET /api/app/status"""
+        success, data, status = self.api_call("GET", "/api/app/status")
+        
+        if success and "is_active" in data:
+            is_active = data["is_active"]
+            self.log_test("App Status", True, 
+                         f"App status: {'Active' if is_active else 'Locked'}")
+            return True
+        else:
+            self.log_test("App Status", False, 
+                         f"Status: {status}, Response: {data}")
+            return False
+
+    def test_admin_app_lock(self):
+        """Test POST /api/admin/app/lock (admin only)"""
+        if not self.session_token:
+            self.log_test("Admin App Lock", False, "No admin session token")
             return False
             
-        success, data, status = self.api_call("GET", "/api/auth/me", token=self.business_session_token)
+        success, data, status = self.api_call("POST", "/api/admin/app/lock", 
+                                            {"message": "Test lock"}, token=self.session_token)
         
-        if success and "user_id" in data and data.get("email") == "business@restaurant.ro":
-            self.log_test("Auth Me Business", True, 
-                         f"Got user info: {data['name']} - {data['email']}")
+        if success:
+            self.log_test("Admin App Lock", True, f"App locked successfully: {data}")
+            return True
         else:
-            self.log_test("Auth Me Business", False, 
+            self.log_test("Admin App Lock", False, 
                          f"Status: {status}, Response: {data}")
-        return success
+            return False
+
+    def test_admin_app_unlock(self):
+        """Test POST /api/admin/app/unlock (admin only)"""
+        if not self.session_token:
+            self.log_test("Admin App Unlock", False, "No admin session token")
+            return False
+            
+        success, data, status = self.api_call("POST", "/api/admin/app/unlock", 
+                                            token=self.session_token)
+        
+        if success:
+            self.log_test("Admin App Unlock", True, f"App unlocked successfully: {data}")
+            return True
+        else:
+            self.log_test("Admin App Unlock", False, 
+                         f"Status: {status}, Response: {data}")
+            return False
+
+    def test_unauthorized_admin_access(self):
+        """Test that admin endpoints require authentication"""
+        # Test without token
+        success, data, status = self.api_call("POST", "/api/admin/app/lock")
+        
+        if status == 401:
+            self.log_test("Unauthorized Admin Access", True, 
+                         "Admin endpoints properly protected (401 without auth)")
+            return True
+        else:
+            self.log_test("Unauthorized Admin Access", False, 
+                         f"Admin endpoints not protected. Status: {status}, Response: {data}")
+            return False
+
+    def test_get_restaurants(self):
+        """Test GET /api/restaurants returns restaurants"""
+        success, data, status = self.api_call("GET", "/api/restaurants")
+        
+        if success and isinstance(data, list):
+            restaurant_count = len(data)
+            self.log_test("Get Restaurants", True, 
+                         f"Found {restaurant_count} restaurants")
+            return True
+        else:
+            self.log_test("Get Restaurants", False, 
+                         f"Status: {status}, Response: {data}")
+            return False
 
     def test_logout(self):
         """Test POST /api/auth/logout"""
@@ -145,92 +219,55 @@ class RestaurantAppAPITester:
         
         if success and status == 200:
             self.log_test("Logout", True, f"Logged out successfully: {data}")
+            return True
         else:
             self.log_test("Logout", False, f"Status: {status}, Response: {data}")
-        return success
-
-    def test_get_restaurants(self):
-        """Test GET /api/restaurants returns restaurants with new media data"""
-        success, data, status = self.api_call("GET", "/api/restaurants")
-        
-        if success and isinstance(data, list) and len(data) > 0:
-            restaurant = data[0]
-            
-            # Check for new media fields
-            has_gallery_images = "gallery_images" in restaurant and isinstance(restaurant["gallery_images"], list)
-            has_video_urls = "video_urls" in restaurant and isinstance(restaurant["video_urls"], list)
-            has_images_3d = "images_3d" in restaurant and isinstance(restaurant["images_3d"], list)
-            
-            # Check video_urls structure
-            video_structure_ok = True
-            if restaurant.get("video_urls"):
-                for video in restaurant["video_urls"]:
-                    if not all(k in video for k in ["title", "url", "thumbnail", "duration"]):
-                        video_structure_ok = False
-                        break
-            
-            # Check images_3d structure
-            images_3d_structure_ok = True
-            if restaurant.get("images_3d"):
-                for image in restaurant["images_3d"]:
-                    if not all(k in image for k in ["title", "model_url", "thumbnail", "type"]):
-                        images_3d_structure_ok = False
-                        break
-            
-            self.log_test("Get Restaurants", True, 
-                         f"Found {len(data)} restaurants. First restaurant has gallery_images: {has_gallery_images}, "
-                         f"video_urls: {has_video_urls}, images_3d: {has_images_3d}, "
-                         f"video structure OK: {video_structure_ok}, 3D structure OK: {images_3d_structure_ok}")
-        else:
-            self.log_test("Get Restaurants", False, 
-                         f"Status: {status}, Response: {data}")
-        return success
-
-    def test_business_account_company(self):
-        """Test if business account has company_id linked"""
-        if not self.business_user_data:
-            self.log_test("Business Account Company", False, "No business user data")
             return False
-        
-        has_company_id = self.business_user_data.get("company_id") is not None
-        is_company = self.business_user_data.get("is_company", False)
-        
-        if has_company_id and is_company:
-            self.log_test("Business Account Company", True, 
-                         f"Business account has company_id: {self.business_user_data['company_id']}, is_company: {is_company}")
-        else:
-            self.log_test("Business Account Company", False, 
-                         f"Business account missing company link. company_id: {self.business_user_data.get('company_id')}, is_company: {is_company}")
-        return has_company_id and is_company
 
     def run_all_tests(self):
-        print(f"🧪 Starting Romanian Restaurant App API Tests")
+        print(f"🧪 Starting Watermark Removal App API Tests")
         print(f"📡 Testing API at: {BACKEND_URL}")
         print("=" * 60)
         
-        # Test dev login endpoints
-        self.test_dev_login_admin()
-        self.test_dev_login_business()
+        # Test admin login with email/password
+        if not self.test_admin_login():
+            print("❌ Admin login failed - stopping critical tests")
+            return False
         
-        # Test auth/me endpoints  
-        self.test_auth_me_admin()
-        self.test_auth_me_business()
+        # Test user registration
+        self.test_user_register()
+        
+        # Test auth/me endpoint
+        self.test_auth_me()
+        
+        # Test app status endpoint
+        self.test_app_status()
+        
+        # Test admin kill switch functionality
+        self.test_admin_app_lock()
+        self.test_admin_app_unlock()
+        
+        # Test unauthorized access protection
+        self.test_unauthorized_admin_access()
+        
+        # Test basic endpoints
+        self.test_get_restaurants()
         
         # Test logout
         self.test_logout()
         
-        # Test restaurants with new media data
-        self.test_get_restaurants()
-        
-        # Test business account company linking
-        self.test_business_account_company()
-        
         print("=" * 60)
         print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
-        return self.tests_passed == self.tests_run
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All backend tests passed!")
+            return True
+        else:
+            print(f"⚠️  {self.tests_run - self.tests_passed} backend tests failed")
+            return False
 
 def main():
-    tester = RestaurantAppAPITester()
+    tester = WatermarkRemovalAPITester()
     success = tester.run_all_tests()
     return 0 if success else 1
 

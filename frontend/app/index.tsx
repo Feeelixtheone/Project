@@ -18,18 +18,28 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../src/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { devLogin } from '../src/utils/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AuthMode = 'welcome' | 'login' | 'register' | 'company';
 
 export default function WelcomeScreen() {
-  const { user, isLoading, login, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, login, register } = useAuth();
   const insets = useSafeAreaInsets();
   const [authMode, setAuthMode] = useState<AuthMode>('welcome');
-  const [devLoginLoading, setDevLoginLoading] = useState<string | null>(null);
-  const { refreshUser } = useAuth();
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [error, setError] = useState('');
   
+  // Login form
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Register form
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [accountType, setAccountType] = useState<'user' | 'business'>('user');
+
   // Company registration form
   const [companyName, setCompanyName] = useState('');
   const [cui, setCui] = useState('');
@@ -43,23 +53,43 @@ export default function WelcomeScreen() {
     }
   }, [isAuthenticated, isLoading]);
 
-  const handleDevLogin = async (email: string, name: string, role: string) => {
-    setDevLoginLoading(email);
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      setError('Completează toate câmpurile');
+      return;
+    }
+    setError('');
+    setLoginLoading(true);
     try {
-      const result = await devLogin(email, name, role);
-      if (result.session_token) {
-        await AsyncStorage.setItem('session_token', result.session_token);
-        // Force a full reload to pick up the new session
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        } else {
-          router.replace('/(tabs)/acasa');
-        }
-      }
-    } catch (error: any) {
-      const msg = error.message || 'Eroare la autentificare';
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Eroare', msg);
-      setDevLoginLoading(null);
+      await login(loginEmail.trim(), loginPassword);
+    } catch (err: any) {
+      setError(err.message || 'Eroare la autentificare');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!regName || !regEmail || !regPassword) {
+      setError('Completează toate câmpurile');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setError('Parolele nu coincid');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setError('Parola trebuie să aibă minim 6 caractere');
+      return;
+    }
+    setError('');
+    setLoginLoading(true);
+    try {
+      await register(regEmail.trim(), regPassword, regName.trim(), accountType);
+    } catch (err: any) {
+      setError(err.message || 'Eroare la înregistrare');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -67,9 +97,9 @@ export default function WelcomeScreen() {
     setCui(value);
     if (value.length > 0) {
       if (!/^\d+$/.test(value)) {
-        setCuiError('CUI-ul trebuie să conțină doar cifre');
+        setCuiError('CUI-ul trebuie sa contina doar cifre');
       } else if (value.length < 2 || value.length > 10) {
-        setCuiError('CUI-ul trebuie să aibă între 2 și 10 cifre');
+        setCuiError('CUI-ul trebuie sa aiba intre 2 si 10 cifre');
       } else {
         setCuiError('');
       }
@@ -80,30 +110,25 @@ export default function WelcomeScreen() {
 
   const handleCompanyRegister = async () => {
     if (!companyName || !cui || !companyEmail || !companyPhone) {
-      Alert.alert('Eroare', 'Completează toate câmpurile');
+      setError('Completează toate câmpurile');
       return;
     }
     if (cuiError) {
-      Alert.alert('Eroare', cuiError);
+      setError(cuiError);
       return;
     }
-    
-    // First login with Google, then register company
-    Alert.alert(
-      'Înregistrare Firmă',
-      'Mai întâi trebuie să te autentifici cu Google, apoi vei putea să îți înregistrezi firma.',
-      [
-        { text: 'Anulează', style: 'cancel' },
-        { text: 'Continuă', onPress: login }
-      ]
-    );
+    // Switch to register mode with business type
+    setRegName(companyName);
+    setRegEmail(companyEmail);
+    setAccountType('business');
+    setAuthMode('register');
   };
 
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Se încarcă...</Text>
+        <Text style={styles.loadingText}>Se incarca...</Text>
       </View>
     );
   }
@@ -116,12 +141,12 @@ export default function WelcomeScreen() {
           <Ionicons name="restaurant" size={56} color={COLORS.primary} />
         </View>
         <Text style={styles.appName}>RestaurantApp</Text>
-        <Text style={styles.tagline}>Descoperă cele mai bune restaurante</Text>
+        <Text style={styles.tagline}>Descopera cele mai bune restaurante</Text>
       </View>
 
       {/* Food Categories Preview */}
       <View style={styles.categoriesPreview}>
-        <Text style={styles.categoriesTitle}>Ce ai poftă să mănânci?</Text>
+        <Text style={styles.categoriesTitle}>Ce ai pofta sa mananci?</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
           {[
             { icon: 'pizza-outline', name: 'Pizza' },
@@ -140,89 +165,39 @@ export default function WelcomeScreen() {
 
       {/* Auth Buttons */}
       <View style={styles.authButtons}>
-        <TouchableOpacity onPress={login} activeOpacity={0.8}>
+        <TouchableOpacity
+          onPress={() => { setError(''); setAuthMode('login'); }}
+          activeOpacity={0.8}
+          data-testid="go-to-login-btn"
+        >
           <LinearGradient
             colors={[COLORS.primary, COLORS.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.primaryButton}
           >
-            <Image
-              source={{ uri: 'https://www.google.com/favicon.ico' }}
-              style={styles.googleIcon}
-            />
-            <Text style={styles.primaryButtonText}>Continuă cu Google</Text>
+            <Ionicons name="log-in-outline" size={24} color={COLORS.text} />
+            <Text style={styles.primaryButtonText}>Autentifica-te</Text>
           </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => setAuthMode('company')}
+          onPress={() => { setError(''); setAccountType('user'); setAuthMode('register'); }}
+          data-testid="go-to-register-btn"
         >
-          <Ionicons name="business-outline" size={22} color={COLORS.primary} />
-          <Text style={styles.secondaryButtonText}>Înregistrează-te ca firmă</Text>
+          <Ionicons name="person-add-outline" size={22} color={COLORS.primary} />
+          <Text style={styles.secondaryButtonText}>Creeaza cont nou</Text>
         </TouchableOpacity>
-      </View>
 
-      {/* Dev Quick Login Accounts */}
-      <View style={styles.devSection}>
-        <Text style={styles.devTitle}>Conturi de test</Text>
-        <View style={styles.devAccounts}>
-          <TouchableOpacity
-            style={[styles.devAccountBtn, styles.devAdminBtn]}
-            onPress={() => handleDevLogin('mutinyretreat37@gmail.com', 'Admin Principal', 'admin')}
-            disabled={devLoginLoading !== null}
-            data-testid="dev-login-admin"
-          >
-            {devLoginLoading === 'mutinyretreat37@gmail.com' ? (
-              <ActivityIndicator size="small" color="#0A0A0A" />
-            ) : (
-              <>
-                <Ionicons name="shield-checkmark" size={18} color="#0A0A0A" />
-                <View>
-                  <Text style={styles.devAccountName}>Admin</Text>
-                  <Text style={styles.devAccountEmail}>mutinyretreat37@gmail.com</Text>
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.devAccountBtn}
-            onPress={() => handleDevLogin('test.user@restaurant.ro', 'Test User', 'user')}
-            disabled={devLoginLoading !== null}
-            data-testid="dev-login-user"
-          >
-            {devLoginLoading === 'test.user@restaurant.ro' ? (
-              <ActivityIndicator size="small" color={COLORS.text} />
-            ) : (
-              <>
-                <Ionicons name="person" size={18} color={COLORS.primary} />
-                <View>
-                  <Text style={styles.devAccountNameLight}>Utilizator Test</Text>
-                  <Text style={styles.devAccountEmailLight}>test.user@restaurant.ro</Text>
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.devAccountBtn, styles.devBusinessBtn]}
-            onPress={() => handleDevLogin('business@restaurant.ro', 'Business Owner', 'user')}
-            disabled={devLoginLoading !== null}
-            data-testid="dev-login-business"
-          >
-            {devLoginLoading === 'business@restaurant.ro' ? (
-              <ActivityIndicator size="small" color={COLORS.text} />
-            ) : (
-              <>
-                <Ionicons name="business" size={18} color={COLORS.secondary} />
-                <View>
-                  <Text style={styles.devAccountNameLight}>Business Owner</Text>
-                  <Text style={styles.devAccountEmailLight}>business@restaurant.ro</Text>
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.secondaryButton, { borderColor: COLORS.secondary }]}
+          onPress={() => { setError(''); setAuthMode('company'); }}
+          data-testid="go-to-company-btn"
+        >
+          <Ionicons name="business-outline" size={22} color={COLORS.secondary} />
+          <Text style={[styles.secondaryButtonText, { color: COLORS.secondary }]}>Inregistreaza-te ca firma</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Support Info */}
@@ -235,9 +210,245 @@ export default function WelcomeScreen() {
       </View>
 
       <Text style={styles.termsText}>
-        Continuând, accepți Termenii și Condițiile noastre
+        Continuand, accepti Termenii si Conditiile noastre
       </Text>
     </View>
+  );
+
+  const renderLogin = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardView}
+    >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScrollContent}>
+        <View style={styles.formHeader}>
+          <TouchableOpacity onPress={() => { setError(''); setAuthMode('welcome'); }} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.formTitle}>Autentificare</Text>
+        </View>
+
+        <View style={styles.loginIconContainer}>
+          <Ionicons name="person-circle" size={64} color={COLORS.primary} />
+        </View>
+
+        {error ? (
+          <View style={styles.errorBox} data-testid="auth-error">
+            <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+            <Text style={styles.errorBoxText}>{error}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.formFields}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                value={loginEmail}
+                onChangeText={setLoginEmail}
+                placeholder="email@exemplu.ro"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                data-testid="login-email-input"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Parola</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.inputField, { flex: 1 }]}
+                value={loginPassword}
+                onChangeText={setLoginPassword}
+                placeholder="Introdu parola"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry={!showPassword}
+                data-testid="login-password-input"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleLogin}
+          activeOpacity={0.8}
+          disabled={loginLoading}
+          data-testid="login-submit-btn"
+        >
+          <LinearGradient
+            colors={[COLORS.primary, COLORS.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.submitButton}
+          >
+            {loginLoading ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <>
+                <Text style={styles.submitButtonText}>Autentifica-te</Text>
+                <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => { setError(''); setAuthMode('register'); }}
+          style={styles.switchLink}
+        >
+          <Text style={styles.switchLinkText}>Nu ai cont? <Text style={styles.switchLinkBold}>Creeaza unul</Text></Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+
+  const renderRegister = () => (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardView}
+    >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScrollContent}>
+        <View style={styles.formHeader}>
+          <TouchableOpacity onPress={() => { setError(''); setAuthMode('welcome'); }} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.formTitle}>Cont Nou</Text>
+        </View>
+
+        {/* Account Type Selector */}
+        <View style={styles.accountTypeSelector}>
+          <TouchableOpacity
+            style={[styles.accountTypeBtn, accountType === 'user' && styles.accountTypeBtnActive]}
+            onPress={() => setAccountType('user')}
+            data-testid="account-type-user"
+          >
+            <Ionicons name="person" size={20} color={accountType === 'user' ? COLORS.text : COLORS.textMuted} />
+            <Text style={[styles.accountTypeBtnText, accountType === 'user' && styles.accountTypeBtnTextActive]}>Utilizator</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.accountTypeBtn, accountType === 'business' && styles.accountTypeBtnActive]}
+            onPress={() => setAccountType('business')}
+            data-testid="account-type-business"
+          >
+            <Ionicons name="business" size={20} color={accountType === 'business' ? COLORS.text : COLORS.textMuted} />
+            <Text style={[styles.accountTypeBtnText, accountType === 'business' && styles.accountTypeBtnTextActive]}>Firma</Text>
+          </TouchableOpacity>
+        </View>
+
+        {error ? (
+          <View style={styles.errorBox} data-testid="register-error">
+            <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+            <Text style={styles.errorBoxText}>{error}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.formFields}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Nume complet</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="person-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                value={regName}
+                onChangeText={setRegName}
+                placeholder="Numele tau"
+                placeholderTextColor={COLORS.textMuted}
+                data-testid="register-name-input"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                value={regEmail}
+                onChangeText={setRegEmail}
+                placeholder="email@exemplu.ro"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                data-testid="register-email-input"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Parola</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                value={regPassword}
+                onChangeText={setRegPassword}
+                placeholder="Minim 6 caractere"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry
+                data-testid="register-password-input"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Confirma parola</Text>
+            <View style={styles.inputWithIcon}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.inputField}
+                value={regConfirmPassword}
+                onChangeText={setRegConfirmPassword}
+                placeholder="Repeta parola"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry
+                data-testid="register-confirm-password-input"
+              />
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleRegister}
+          activeOpacity={0.8}
+          disabled={loginLoading}
+          data-testid="register-submit-btn"
+        >
+          <LinearGradient
+            colors={[COLORS.primary, COLORS.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.submitButton}
+          >
+            {loginLoading ? (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            ) : (
+              <>
+                <Text style={styles.submitButtonText}>Creeaza cont</Text>
+                <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => { setError(''); setAuthMode('login'); }}
+          style={styles.switchLink}
+        >
+          <Text style={styles.switchLinkText}>Ai deja cont? <Text style={styles.switchLinkBold}>Autentifica-te</Text></Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 
   const renderCompanyRegister = () => (
@@ -246,24 +457,28 @@ export default function WelcomeScreen() {
       style={styles.keyboardView}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formScrollContent}>
-        {/* Header */}
         <View style={styles.formHeader}>
-          <TouchableOpacity onPress={() => setAuthMode('welcome')} style={styles.backButton}>
+          <TouchableOpacity onPress={() => { setError(''); setAuthMode('welcome'); }} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.formTitle}>Înregistrare Firmă</Text>
+          <Text style={styles.formTitle}>Inregistrare Firma</Text>
         </View>
 
-        {/* Company Icon */}
         <View style={styles.companyIconContainer}>
           <Ionicons name="business" size={48} color={COLORS.primary} />
         </View>
 
         <Text style={styles.formSubtitle}>
-          Înregistrează-ți firma și începe să îți promovezi restaurantul
+          Inregistreaza-ti firma si incepe sa iti promovezi restaurantul
         </Text>
 
-        {/* Form Fields */}
+        {error ? (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+            <Text style={styles.errorBoxText}>{error}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.formFields}>
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Numele Firmei</Text>
@@ -290,7 +505,7 @@ export default function WelcomeScreen() {
             {cuiError ? (
               <Text style={styles.errorText}>{cuiError}</Text>
             ) : (
-              <Text style={styles.helperText}>CUI-ul trebuie să conțină între 2 și 10 cifre</Text>
+              <Text style={styles.helperText}>CUI-ul trebuie sa contina intre 2 si 10 cifre</Text>
             )}
           </View>
 
@@ -320,39 +535,36 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        {/* Info Box */}
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={24} color={COLORS.secondary} />
           <View style={styles.infoBoxContent}>
-            <Text style={styles.infoBoxTitle}>Cum funcționează?</Text>
+            <Text style={styles.infoBoxTitle}>Cum functioneaza?</Text>
             <Text style={styles.infoBoxText}>
               1. Completează datele firmei{'\n'}
-              2. Autentifică-te cu Google{'\n'}
-              3. Așteaptă verificarea CUI-ului de către admin{'\n'}
-              4. După aprobare, poți adăuga restaurantul tău
+              2. Creează un cont cu email și parolă{'\n'}
+              3. Așteaptă verificarea CUI de către admin{'\n'}
+              4. După aprobare, poți adăuga restaurantul
             </Text>
           </View>
         </View>
 
-        {/* Fee Info */}
         <View style={styles.feeBox}>
           <Ionicons name="cash-outline" size={20} color={COLORS.gold} />
           <Text style={styles.feeText}>
-            Comision platformă: <Text style={styles.feeBold}>1.7%</Text> din fiecare achiziție
+            Comision platforma: <Text style={styles.feeBold}>2.7%</Text> din fiecare achizitie
           </Text>
         </View>
 
-        {/* Submit Button */}
         <TouchableOpacity
-          style={styles.submitButton}
+          style={styles.submitButtonPlain}
           onPress={handleCompanyRegister}
           activeOpacity={0.8}
+          data-testid="company-continue-btn"
         >
-          <Text style={styles.submitButtonText}>Continuă cu Google</Text>
+          <Text style={styles.submitButtonText}>Continua cu inregistrarea</Text>
           <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
         </TouchableOpacity>
 
-        {/* Support */}
         <View style={styles.companySupport}>
           <Text style={styles.companySupportText}>Suport pentru firme:</Text>
           <Text style={styles.companySupportEmail}>support.firme@restaurantapp.ro</Text>
@@ -363,7 +575,6 @@ export default function WelcomeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Background */}
       <Image
         source={{ uri: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800' }}
         style={styles.backgroundImage}
@@ -371,8 +582,9 @@ export default function WelcomeScreen() {
       />
       <View style={styles.overlay} />
 
-      {/* Content */}
       {authMode === 'welcome' && renderWelcome()}
+      {authMode === 'login' && renderLogin()}
+      {authMode === 'register' && renderRegister()}
       {authMode === 'company' && renderCompanyRegister()}
     </View>
   );
@@ -481,10 +693,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     minHeight: 56,
   },
-  googleIcon: {
-    width: 24,
-    height: 24,
-  },
   primaryButtonText: {
     fontFamily: FONTS.semiBold,
     fontSize: 18,
@@ -534,58 +742,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.md,
   },
-  // Dev Login Styles
-  devSection: {
-    marginTop: SPACING.lg,
-  },
-  devTitle: {
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
-  },
-  devAccounts: {
-    gap: SPACING.sm,
-  },
-  devAccountBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  devAdminBtn: {
-    backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
-  },
-  devAccountName: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-    color: '#0A0A0A',
-  },
-  devAccountEmail: {
-    fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: 'rgba(0,0,0,0.6)',
-  },
-  devAccountNameLight: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-    color: COLORS.text,
-  },
-  devAccountEmailLight: {
-    fontFamily: FONTS.regular,
-    fontSize: 11,
-    color: COLORS.textMuted,
-  },
-  devBusinessBtn: {
-    borderColor: COLORS.secondary + '60',
-  },
-  // Company Registration Styles
+  // Form Styles
   formScrollContent: {
     padding: SPACING.lg,
     paddingBottom: SPACING.xxl,
@@ -609,25 +766,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: COLORS.text,
   },
-  companyIconContainer: {
+  loginIconContainer: {
     alignSelf: 'center',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255, 107, 53, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  formSubtitle: {
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
     marginBottom: SPACING.lg,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorBoxText: {
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    color: COLORS.error,
+    flex: 1,
   },
   formFields: {
     gap: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   inputGroup: {
     gap: SPACING.xs,
@@ -636,6 +798,28 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  inputIcon: {
+    paddingLeft: SPACING.md,
+  },
+  inputField: {
+    flex: 1,
+    padding: SPACING.md,
+    fontFamily: FONTS.regular,
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  eyeBtn: {
+    paddingRight: SPACING.md,
+    padding: SPACING.sm,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -659,6 +843,92 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.error,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    minHeight: 56,
+  },
+  submitButtonPlain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.lg,
+    minHeight: 56,
+  },
+  submitButtonText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 18,
+    color: COLORS.text,
+  },
+  switchLink: {
+    alignItems: 'center',
+    marginTop: SPACING.lg,
+  },
+  switchLinkText: {
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  switchLinkBold: {
+    fontFamily: FONTS.semiBold,
+    color: COLORS.primary,
+  },
+  // Account type selector
+  accountTypeSelector: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  accountTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  accountTypeBtnActive: {
+    backgroundColor: COLORS.primary + '30',
+    borderColor: COLORS.primary,
+  },
+  accountTypeBtnText: {
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    color: COLORS.textMuted,
+  },
+  accountTypeBtnTextActive: {
+    color: COLORS.text,
+  },
+  // Company styles
+  companyIconContainer: {
+    alignSelf: 'center',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255, 107, 53, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  formSubtitle: {
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
   },
   infoBox: {
     flexDirection: 'row',
@@ -704,22 +974,6 @@ const styles = StyleSheet.create({
   feeBold: {
     fontFamily: FONTS.bold,
     color: COLORS.gold,
-  },
-  submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    marginTop: SPACING.lg,
-    minHeight: 56,
-  },
-  submitButtonText: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 18,
-    color: COLORS.text,
   },
   companySupport: {
     alignItems: 'center',

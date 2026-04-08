@@ -14,6 +14,8 @@ from datetime import datetime, timezone, timedelta
 import httpx
 import random
 import string
+import bcrypt
+import jwt as pyjwt
 
 # Stripe integration
 from emergentintegrations.payments.stripe.checkout import (
@@ -48,7 +50,38 @@ logger = logging.getLogger(__name__)
 PLATFORM_COMMISSION_PERCENTAGE = 2.7  # 2.7% commission deducted from restaurant
 SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
 SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
-ADMIN_EMAIL = "mutinyretreat37@gmail.com"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "mutinyretreat37@gmail.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "karaplange2")
+JWT_SECRET = os.environ.get("JWT_SECRET", "fallback-secret-change-me")
+JWT_ALGORITHM = "HS256"
+
+# ==================== PASSWORD & JWT HELPERS ====================
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+def create_session_token(user_id: str, email: str) -> str:
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "type": "access"
+    }
+    return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_token(token: str) -> Optional[dict]:
+    try:
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except pyjwt.ExpiredSignatureError:
+        return None
+    except pyjwt.InvalidTokenError:
+        return None
 
 ANAF_API_URL = "https://webservicesp.anaf.ro/PlatitorTvaRest/api/v8/ws/tva"
 
@@ -82,19 +115,13 @@ class User(BaseModel):
     address: Optional[str] = None
     is_company: bool = False
     company_id: Optional[str] = None
+    role: Optional[str] = "user"
     created_at: datetime
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-
-class SessionDataResponse(BaseModel):
-    id: str
-    email: str
-    name: str
-    picture: Optional[str] = None
-    session_token: str
 
 # Company/Business Models
 class Company(BaseModel):
@@ -439,18 +466,27 @@ async def get_session_token(request: Request) -> Optional[str]:
     return None
 
 async def get_current_user(request: Request) -> Optional[User]:
-    session_token = await get_session_token(request)
-    if not session_token:
+    token = await get_session_token(request)
+    if not token:
         return None
     
+    # Try JWT decode first
+    payload = decode_token(token)
+    if payload:
+        user_id = payload.get("sub")
+        if user_id:
+            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+            if user_doc:
+                return User(**user_doc)
+    
+    # Fallback to session lookup (for existing sessions)
     session = await db.user_sessions.find_one(
-        {"session_token": session_token},
+        {"session_token": token},
         {"_id": 0}
     )
     if not session:
         return None
     
-    # Check expiry with timezone awareness
     expires_at = session["expires_at"]
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -472,7 +508,6 @@ async def require_auth(request: Request) -> User:
     return user
 
 async def require_admin(request: Request) -> User:
-    """Require admin authentication"""
     user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Nu ești autentificat")
@@ -481,7 +516,6 @@ async def require_admin(request: Request) -> User:
     return user
 
 async def is_admin(user: User) -> bool:
-    """Check if user is admin"""
     return user.email == ADMIN_EMAIL
 
 # ==================== NOTIFICATION HELPERS ====================
@@ -621,76 +655,90 @@ async def verify_cui_anaf(cui: str) -> dict:
 
 # ==================== AUTH ROUTES ====================
 
-@api_router.post("/auth/session")
-async def exchange_session(request: Request, response: Response):
-    """Exchange session_id for session_token"""
-    session_id = request.headers.get("X-Session-ID")
-    if not session_id:
-        raise HTTPException(status_code=400, detail="Session ID lipsă")
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    account_type: str = "user"  # "user" or "business"
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@api_router.post("/auth/register")
+async def register_user(data: RegisterRequest, response: Response):
+    """Register a new user with email and password"""
+    email = data.email.strip().lower()
     
-    # Call Emergent Auth API
-    async with httpx.AsyncClient() as client:
-        try:
-            auth_response = await client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id}
-            )
-            if auth_response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Sesiune invalidă")
-            
-            user_data = auth_response.json()
-        except Exception as e:
-            logger.error(f"Auth API error: {e}")
-            raise HTTPException(status_code=500, detail="Eroare de autentificare")
+    # Check if email already exists
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Acest email este deja înregistrat")
     
-    session_data = SessionDataResponse(**user_data)
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    password_hash = hash_password(data.password)
     
-    # Check if user exists
-    existing_user = await db.users.find_one(
-        {"email": session_data.email},
-        {"_id": 0}
-    )
-    
-    if existing_user:
-        user_id = existing_user["user_id"]
-    else:
-        # Create new user
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        new_user = {
-            "user_id": user_id,
-            "email": session_data.email,
-            "name": session_data.name,
-            "picture": session_data.picture,
-            "phone": None,
-            "address": None,
-            "is_company": False,
-            "company_id": None,
-            "created_at": datetime.now(timezone.utc)
-        }
-        await db.users.insert_one(new_user)
-    
-    # Store session
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.insert_one({
+    new_user = {
         "user_id": user_id,
-        "session_token": session_data.session_token,
-        "expires_at": expires_at,
+        "email": email,
+        "name": data.name,
+        "password_hash": password_hash,
+        "picture": None,
+        "phone": None,
+        "address": None,
+        "is_company": data.account_type == "business",
+        "company_id": None,
+        "role": "admin" if email == ADMIN_EMAIL else "user",
         "created_at": datetime.now(timezone.utc)
-    })
+    }
+    await db.users.insert_one(new_user)
     
-    # Set cookie
+    # Create JWT token
+    session_token = create_session_token(user_id, email)
+    
     response.set_cookie(
         key="session_token",
-        value=session_data.session_token,
+        value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=False,
+        samesite="lax",
         path="/",
         max_age=7 * 24 * 60 * 60
     )
     
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return {"user": user, "session_token": session_data.session_token}
+    user_data = {k: v for k, v in new_user.items() if k not in ("_id", "password_hash")}
+    return {"user": user_data, "session_token": session_token}
+
+@api_router.post("/auth/login")
+async def login_user(data: LoginRequest, response: Response):
+    """Login with email and password"""
+    email = data.email.strip().lower()
+    
+    user_doc = await db.users.find_one({"email": email})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="Email sau parolă greșită")
+    
+    if not user_doc.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Email sau parolă greșită")
+    
+    if not verify_password(data.password, user_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Email sau parolă greșită")
+    
+    user_id = user_doc["user_id"]
+    session_token = create_session_token(user_id, email)
+    
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/",
+        max_age=7 * 24 * 60 * 60
+    )
+    
+    user_data = {k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")}
+    return {"user": user_data, "session_token": session_token}
 
 @api_router.get("/auth/me")
 async def get_me(request: Request):
@@ -1599,11 +1647,13 @@ async def seed_data():
             "user_id": business_user_id,
             "email": business_email,
             "name": "Business Owner",
+            "password_hash": hash_password("business123"),
             "picture": None,
             "phone": "+40 722 111 222",
             "address": "Str. Victoriei 45, București",
             "is_company": True,
             "company_id": None,
+            "role": "user",
             "created_at": datetime.now(timezone.utc)
         })
         
@@ -3997,17 +4047,102 @@ async def get_referral_leaderboard():
             })
     return result
 
+# ==================== ADMIN KILL SWITCH ====================
+
+@api_router.get("/app/status")
+async def get_app_status():
+    """Check if app is active (kill switch check)"""
+    config = await db.app_config.find_one({"key": "app_status"}, {"_id": 0})
+    if config and config.get("is_locked"):
+        return {
+            "is_active": False,
+            "message": config.get("lock_message", "Aplicația a fost dezactivată."),
+            "locked_at": config.get("locked_at")
+        }
+    return {"is_active": True, "message": "OK"}
+
+@api_router.post("/admin/app/lock")
+async def admin_lock_app(
+    message: str = "Aplicația a fost dezactivată de administrator.",
+    user: User = Depends(require_admin)
+):
+    """Admin: Lock the app (kill switch)"""
+    await db.app_config.update_one(
+        {"key": "app_status"},
+        {"$set": {
+            "key": "app_status",
+            "is_locked": True,
+            "lock_message": message,
+            "locked_at": datetime.now(timezone.utc),
+            "locked_by": user.email
+        }},
+        upsert=True
+    )
+    return {"message": "Aplicația a fost blocată"}
+
+@api_router.post("/admin/app/unlock")
+async def admin_unlock_app(user: User = Depends(require_admin)):
+    """Admin: Unlock the app"""
+    await db.app_config.update_one(
+        {"key": "app_status"},
+        {"$set": {"is_locked": False, "lock_message": None, "locked_at": None}},
+        upsert=True
+    )
+    return {"message": "Aplicația a fost deblocată"}
+
+@api_router.post("/admin/app/wipe")
+async def admin_wipe_app(
+    confirm: str = "",
+    user: User = Depends(require_admin)
+):
+    """Admin: Wipe all app data except admin account (nuclear option)"""
+    if confirm != "CONFIRM_WIPE":
+        raise HTTPException(status_code=400, detail="Trimite confirm=CONFIRM_WIPE pentru a confirma ștergerea")
+    
+    # Lock the app first
+    await db.app_config.update_one(
+        {"key": "app_status"},
+        {"$set": {
+            "key": "app_status",
+            "is_locked": True,
+            "lock_message": "Aplicația a fost ștearsă. Toate datele au fost eliminate.",
+            "locked_at": datetime.now(timezone.utc),
+            "locked_by": user.email
+        }},
+        upsert=True
+    )
+    
+    # Wipe all collections except users (keep admin) and app_config
+    collections_to_wipe = [
+        "restaurants", "reviews", "reservations", "orders",
+        "companies", "company_stores", "store_products",
+        "chat_conversations", "chat_messages", "payment_methods",
+        "payment_transactions", "restaurant_likes", "favorites",
+        "feedback", "special_offers", "user_notifications",
+        "restaurant_notifications", "admin_notifications",
+        "restaurant_of_the_week", "loyalty_points", "loyalty_history",
+        "referrals", "referral_history", "receipts", "push_tokens",
+        "user_sessions"
+    ]
+    
+    for collection in collections_to_wipe:
+        await db[collection].delete_many({})
+    
+    # Delete all non-admin users
+    await db.users.delete_many({"email": {"$ne": ADMIN_EMAIL}})
+    
+    return {"message": "Toate datele au fost șterse. Aplicația este blocată."}
+
 # ==================== DEV AUTH (Quick Login for Testing) ====================
 
 class DevLoginRequest(BaseModel):
     email: str
     name: str
-    role: str = "user"  # "admin" or "user"
+    role: str = "user"
 
 @api_router.post("/auth/dev-login")
 async def dev_login(data: DevLoginRequest, response: Response):
     """Quick dev login for testing - creates or finds user and returns session"""
-    # Check if user exists
     existing_user = await db.users.find_one({"email": data.email}, {"_id": 0})
     
     if existing_user:
@@ -4018,37 +4153,32 @@ async def dev_login(data: DevLoginRequest, response: Response):
             "user_id": user_id,
             "email": data.email,
             "name": data.name,
+            "password_hash": hash_password("test123"),
             "picture": None,
             "phone": None,
             "address": None,
             "is_company": False,
             "company_id": None,
+            "role": "admin" if data.email == ADMIN_EMAIL else "user",
             "created_at": datetime.now(timezone.utc)
         }
         await db.users.insert_one(new_user)
     
-    # Create session
-    session_token = f"dev_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc)
-    })
+    session_token = create_session_token(user_id, data.email)
     
     response.set_cookie(
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=False,
+        samesite="lax",
         path="/",
         max_age=7 * 24 * 60 * 60
     )
     
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return {"user": user, "session_token": session_token}
+    user_data = {k: v for k, v in user.items() if k != "password_hash"}
+    return {"user": user_data, "session_token": session_token}
 
 # ==================== BASIC ROUTES ====================
 
@@ -4070,6 +4200,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==================== STARTUP: SEED ADMIN ====================
+
+@app.on_event("startup")
+async def startup_seed():
+    """Seed admin user on startup"""
+    try:
+        existing_admin = await db.users.find_one({"email": ADMIN_EMAIL})
+        if not existing_admin:
+            admin_id = f"user_admin_{uuid.uuid4().hex[:8]}"
+            await db.users.insert_one({
+                "user_id": admin_id,
+                "email": ADMIN_EMAIL,
+                "name": "Admin Principal",
+                "password_hash": hash_password(ADMIN_PASSWORD),
+                "picture": None,
+                "phone": None,
+                "address": None,
+                "is_company": False,
+                "company_id": None,
+                "role": "admin",
+                "created_at": datetime.now(timezone.utc)
+            })
+            logger.info(f"Admin user seeded: {ADMIN_EMAIL}")
+        else:
+            # Ensure admin has password_hash
+            if not existing_admin.get("password_hash"):
+                await db.users.update_one(
+                    {"email": ADMIN_EMAIL},
+                    {"$set": {"password_hash": hash_password(ADMIN_PASSWORD), "role": "admin"}}
+                )
+                logger.info("Admin password_hash updated")
+        
+        # Initialize app status if not exists
+        app_status = await db.app_config.find_one({"key": "app_status"})
+        if not app_status:
+            await db.app_config.insert_one({
+                "key": "app_status",
+                "is_locked": False,
+                "lock_message": None,
+                "locked_at": None
+            })
+        
+        # Create indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("user_id", unique=True)
+        
+    except Exception as e:
+        logger.error(f"Startup seed error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

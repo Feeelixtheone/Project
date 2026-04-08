@@ -456,6 +456,75 @@ export default function AdminDashboard() {
           </View>
         </View>
 
+        {/* Kill Switch / App Protection */}
+        <View style={[styles.section, { borderWidth: 1, borderColor: COLORS.error + '40' }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: COLORS.error }]}>Protecție Aplicație</Text>
+            <Ionicons name="shield" size={20} color={COLORS.error} />
+          </View>
+          <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary, marginBottom: SPACING.md }}>
+            Controlează accesul la aplicație. Folosește în caz de acces neautorizat.
+          </Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, { borderColor: COLORS.warning + '60' }]}
+              onPress={async () => {
+                const msg = Platform.OS === 'web'
+                  ? window.prompt('Mesaj de blocare (opțional):') || 'Aplicația a fost dezactivată temporar.'
+                  : 'Aplicația a fost dezactivată temporar.';
+                try {
+                  await apiRequest(`/api/admin/app/lock?message=${encodeURIComponent(msg)}`, { method: 'POST' });
+                  Platform.OS === 'web' ? window.alert('Aplicația a fost BLOCATĂ') : Alert.alert('Blocat', 'Aplicația a fost blocată');
+                } catch (e: any) {
+                  Platform.OS === 'web' ? window.alert(e.message) : Alert.alert('Eroare', e.message);
+                }
+              }}
+              data-testid="admin-lock-app"
+            >
+              <Ionicons name="lock-closed" size={24} color={COLORS.warning} />
+              <Text style={[styles.actionText, { color: COLORS.warning }]}>Blochează App</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, { borderColor: COLORS.success + '60' }]}
+              onPress={async () => {
+                try {
+                  await apiRequest('/api/admin/app/unlock', { method: 'POST' });
+                  Platform.OS === 'web' ? window.alert('Aplicația a fost DEBLOCATĂ') : Alert.alert('Deblocat', 'Aplicația a fost deblocată');
+                } catch (e: any) {
+                  Platform.OS === 'web' ? window.alert(e.message) : Alert.alert('Eroare', e.message);
+                }
+              }}
+              data-testid="admin-unlock-app"
+            >
+              <Ionicons name="lock-open" size={24} color={COLORS.success} />
+              <Text style={[styles.actionText, { color: COLORS.success }]}>Deblochează App</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={{ backgroundColor: COLORS.error + '20', borderRadius: BORDER_RADIUS.md, padding: SPACING.md, marginTop: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, borderWidth: 1, borderColor: COLORS.error + '60' }}
+            onPress={async () => {
+              const confirmed = Platform.OS === 'web'
+                ? window.confirm('ATENȚIE: Această acțiune va ȘTERGE TOATE datele (restaurante, comenzi, utilizatori non-admin). Confirmă?')
+                : false;
+              if (confirmed) {
+                try {
+                  await apiRequest('/api/admin/app/wipe?confirm=CONFIRM_WIPE', { method: 'POST' });
+                  Platform.OS === 'web' ? window.alert('Toate datele au fost șterse. Aplicația este blocată.') : Alert.alert('Șters', 'Toate datele au fost șterse.');
+                } catch (e: any) {
+                  Platform.OS === 'web' ? window.alert(e.message) : Alert.alert('Eroare', e.message);
+                }
+              }
+            }}
+            data-testid="admin-wipe-app"
+          >
+            <Ionicons name="nuclear" size={20} color={COLORS.error} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: FONTS.semiBold, fontSize: 14, color: COLORS.error }}>Șterge totul (Opțiune nucleară)</Text>
+              <Text style={{ fontFamily: FONTS.regular, fontSize: 12, color: COLORS.textMuted }}>Blochează aplicația și șterge toate datele</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Restaurant of the Week Management */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>

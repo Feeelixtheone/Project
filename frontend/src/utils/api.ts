@@ -296,6 +296,27 @@ export const applyReferralCode = (code: string) =>
 export const getReferralLeaderboard = () =>
   apiRequest<any[]>('/api/referral/leaderboard');
 
+// Auth APIs
+export const loginUser = (email: string, password: string) =>
+  apiRequest<any>('/api/auth/login', { method: 'POST', body: { email, password } });
+
+export const registerUser = (data: { email: string; password: string; name: string; account_type: string }) =>
+  apiRequest<any>('/api/auth/register', { method: 'POST', body: data });
+
+// App Status (Kill Switch)
+export const getAppStatus = () =>
+  apiRequest<any>('/api/app/status');
+
+// Admin Kill Switch
+export const adminLockApp = (message?: string) =>
+  apiRequest<any>(`/api/admin/app/lock${message ? `?message=${encodeURIComponent(message)}` : ''}`, { method: 'POST' });
+
+export const adminUnlockApp = () =>
+  apiRequest<any>('/api/admin/app/unlock', { method: 'POST' });
+
+export const adminWipeApp = () =>
+  apiRequest<any>('/api/admin/app/wipe?confirm=CONFIRM_WIPE', { method: 'POST' });
+
 // Dev Auth (Quick Login)
 export const devLogin = (email: string, name: string, role: string = 'user') =>
   apiRequest<any>('/api/auth/dev-login', { method: 'POST', body: { email, name, role } });
