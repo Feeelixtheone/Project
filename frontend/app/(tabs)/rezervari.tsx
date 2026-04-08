@@ -326,15 +326,11 @@ export default function RezervariScreen() {
         <View style={styles.paymentInfo}>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentLabel}>
-              {item.reservation_type === 'food_ready' ? 'Total mâncare' : 'Taxă în avans'}
+              {item.reservation_type === 'food_ready' ? 'Total mâncare' : 'Rezervare'}
             </Text>
             <Text style={styles.paymentValue}>
-              {item.reservation_type === 'food_ready' ? item.food_total : item.upfront_fee} RON
+              {item.reservation_type === 'food_ready' ? `${item.food_total} RON` : 'Gratuit'}
             </Text>
-          </View>
-          <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>Comision platformă (2.7%) - dedus din restaurant</Text>
-            <Text style={styles.paymentValue}>{item.platform_fee || item.platform_commission} RON</Text>
           </View>
           <View style={[styles.paymentRow, styles.paymentTotal]}>
             <Text style={styles.paymentTotalLabel}>Total plătit</Text>
@@ -640,23 +636,15 @@ export default function RezervariScreen() {
                   {reservationType === 'table_only' ? (
                     <>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Taxă în avans</Text>
-                        <Text style={styles.priceValue}>{selectedRestaurant.upfront_fee || 20} RON</Text>
-                      </View>
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Comision (2.7%) - dedus din restaurant</Text>
-                        <Text style={styles.priceValue}>
-                          {((selectedRestaurant.upfront_fee || 20) * 0.027).toFixed(2)} RON
-                        </Text>
+                        <Text style={styles.priceLabel}>Rezervare masă</Text>
+                        <Text style={[styles.priceValue, { color: COLORS.success }]}>Gratuit</Text>
                       </View>
                       <View style={[styles.priceRow, styles.priceTotal]}>
                         <Text style={styles.priceTotalLabel}>Total de plătit</Text>
-                        <Text style={styles.priceTotalValue}>
-                          {(selectedRestaurant.upfront_fee || 20).toFixed(2)} RON
-                        </Text>
+                        <Text style={styles.priceTotalValue}>0.00 RON</Text>
                       </View>
                       <Text style={styles.priceNote}>
-                        * Taxa în avans va fi dedusă din nota finală
+                        * Plata se face la restaurant la finalul mesei
                       </Text>
                     </>
                   ) : (
@@ -664,12 +652,6 @@ export default function RezervariScreen() {
                       <View style={styles.priceRow}>
                         <Text style={styles.priceLabel}>Total mâncare</Text>
                         <Text style={styles.priceValue}>{calculateFoodTotal().toFixed(2)} RON</Text>
-                      </View>
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Comision (2.7%) - dedus din restaurant</Text>
-                        <Text style={styles.priceValue}>
-                          {(calculateFoodTotal() * 0.027).toFixed(2)} RON
-                        </Text>
                       </View>
                       <View style={[styles.priceRow, styles.priceTotal]}>
                         <Text style={styles.priceTotalLabel}>Total de plătit</Text>
@@ -699,7 +681,7 @@ export default function RezervariScreen() {
                     <Text style={styles.submitButtonText}>
                       {reservationType === 'food_ready' 
                         ? `Plătește ${calculateFoodTotal().toFixed(2)} RON` 
-                        : `Plătește ${(selectedRestaurant?.upfront_fee || 20).toFixed(2)} RON (avans)`}
+                        : 'Confirmă rezervarea'}
                     </Text>
                   </>
                 )}

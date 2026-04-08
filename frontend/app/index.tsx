@@ -550,9 +550,9 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.feeBox}>
-          <Ionicons name="cash-outline" size={20} color={COLORS.gold} />
+          <Ionicons name="information-circle-outline" size={20} color={COLORS.secondary} />
           <Text style={styles.feeText}>
-            Comision platforma: <Text style={styles.feeBold}>2.7%</Text> din fiecare achizitie
+            Detaliile comerciale vor fi discutate după aprobare
           </Text>
         </View>
 

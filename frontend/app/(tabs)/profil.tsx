@@ -578,8 +578,8 @@ export default function ProfilScreen() {
           </View>
         </View>
         <View style={styles.feeInfo}>
-          <Ionicons name="cash-outline" size={18} color={COLORS.gold} />
-          <Text style={styles.feeInfoText}>Comision platformă: <Text style={styles.feeBold}>2.7%</Text> dedus din încasările restaurantelor</Text>
+          <Ionicons name="information-circle-outline" size={18} color={COLORS.textSecondary} />
+          <Text style={styles.feeInfoText}>Rezervările sunt gratuite. Plătești doar ce consumi.</Text>
         </View>
       </View>
 
