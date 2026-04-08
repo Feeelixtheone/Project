@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Image,
   ActivityIndicator,
   ScrollView,
@@ -165,21 +166,21 @@ export default function WelcomeScreen() {
 
       {/* Auth Buttons */}
       <View style={styles.authButtons}>
-        <TouchableOpacity
+        <Pressable
           onPress={() => { setError(''); setAuthMode('login'); }}
-          activeOpacity={0.8}
           data-testid="go-to-login-btn"
+          style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
         >
           <LinearGradient
             colors={[COLORS.primary, COLORS.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.primaryButton}
+            style={[styles.primaryButton, { pointerEvents: 'none' as any }]}
           >
             <Ionicons name="log-in-outline" size={24} color={COLORS.text} />
             <Text style={styles.primaryButtonText}>Autentifica-te</Text>
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
 
         <TouchableOpacity
           style={styles.secondaryButton}
@@ -278,17 +279,17 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <Pressable
           onPress={handleLogin}
-          activeOpacity={0.8}
           disabled={loginLoading}
           data-testid="login-submit-btn"
+          style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
         >
           <LinearGradient
             colors={[COLORS.primary, COLORS.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.submitButton}
+            style={[styles.submitButton, { pointerEvents: 'none' as any }]}
           >
             {loginLoading ? (
               <ActivityIndicator size="small" color={COLORS.text} />
@@ -299,7 +300,7 @@ export default function WelcomeScreen() {
               </>
             )}
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
 
         <TouchableOpacity
           onPress={() => { setError(''); setAuthMode('register'); }}
@@ -418,17 +419,17 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <Pressable
           onPress={handleRegister}
-          activeOpacity={0.8}
           disabled={loginLoading}
           data-testid="register-submit-btn"
+          style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
         >
           <LinearGradient
             colors={[COLORS.primary, COLORS.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.submitButton}
+            style={[styles.submitButton, { pointerEvents: 'none' as any }]}
           >
             {loginLoading ? (
               <ActivityIndicator size="small" color={COLORS.text} />
@@ -439,7 +440,7 @@ export default function WelcomeScreen() {
               </>
             )}
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
 
         <TouchableOpacity
           onPress={() => { setError(''); setAuthMode('login'); }}
