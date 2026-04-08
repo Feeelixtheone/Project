@@ -3,7 +3,7 @@
 ## Admin Account
 - **Email**: mutinyretreat37@gmail.com
 - **Password**: karaplange2
-- **Role**: admin (full access)
+- **Role**: admin (full access - kill switch, wipe, lock/unlock)
 
 ## Business Test Account (seeded)
 - **Email**: business@restaurant.ro
