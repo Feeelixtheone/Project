@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Public endpoint from the frontend .env
-BACKEND_URL = "https://watermark-removal-8.preview.emergentagent.com"
+BACKEND_URL = "https://commission-rates.preview.emergentagent.com"
 
 class HamzaRestaurantTester:
     def __init__(self):

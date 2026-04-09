@@ -2,7 +2,6 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depend
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
@@ -27,13 +26,14 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest
 )
 
+# MySQL database wrapper (replaces MongoDB)
+from database import init_mysql_pool, close_mysql_pool, MySQLDB
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MySQL connection - initialized on startup
+db: MySQLDB = None
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -48,8 +48,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Constants
-PLATFORM_COMMISSION_PERCENTAGE = 2.7  # 2.7% commission deducted from restaurant
+# Constants - Commission rates
+COMMISSION_RECURRING_PERCENTAGE = 4.7  # 4.7% commission on recurring clients
+COMMISSION_NEW_PERCENTAGE = 7.0  # 7% commission on new customers
+PLATFORM_COMMISSION_PERCENTAGE = COMMISSION_RECURRING_PERCENTAGE  # Default to recurring rate
 SUPPORT_EMAIL_CLIENTS = "support.clienti@restaurantapp.ro"
 SUPPORT_EMAIL_COMPANIES = "support.firme@restaurantapp.ro"
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "mutinyretreat37@gmail.com")
@@ -220,6 +222,13 @@ class StoreProduct(BaseModel):
     image_url: str
     image_3d_url: Optional[str] = None  # 3D image
     is_available: bool = True
+    kcal: Optional[int] = None
+    protein: Optional[float] = None
+    carbs: Optional[float] = None
+    fats: Optional[float] = None
+    fiber: Optional[float] = None
+    ingredients: Optional[str] = None
+    allergens: Optional[List[str]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StoreProductCreate(BaseModel):
@@ -230,6 +239,13 @@ class StoreProductCreate(BaseModel):
     quantity: str
     image_url: str
     image_3d_url: Optional[str] = None
+    kcal: Optional[int] = None
+    protein: Optional[float] = None
+    carbs: Optional[float] = None
+    fats: Optional[float] = None
+    fiber: Optional[float] = None
+    ingredients: Optional[str] = None
+    allergens: Optional[List[str]] = None
 
 # Transaction/Order with fee
 class Transaction(BaseModel):
@@ -258,6 +274,7 @@ class MenuItem(BaseModel):
     carbs: Optional[float] = None
     fats: Optional[float] = None
     fiber: Optional[float] = None
+    ingredients: Optional[str] = None  # Comma-separated ingredients list
     allergens: Optional[List[str]] = None
 
 class VideoMedia(BaseModel):
@@ -428,12 +445,19 @@ class RestaurantLike(BaseModel):
 class RestaurantNotification(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     restaurant_id: str
-    notification_type: str  # new_reservation, order_update, payment_received
+    notification_type: str  # new_reservation, order_update, payment_received, capacity_alert
     title: str
     message: str
     data: Optional[Dict] = None
     is_read: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Reservation Capacity Settings
+class ReservationCapacitySettings(BaseModel):
+    restaurant_id: str
+    max_reservations_per_hour: int = 10  # Default: notify at 10
+    notify_on_capacity: bool = True  # Enable capacity alerts
+    custom_timeframe_minutes: int = 60  # Timeframe window in minutes
 
 # Receipt Model
 class Receipt(BaseModel):
@@ -453,6 +477,28 @@ class Receipt(BaseModel):
     receipt_number: str  # Generated based on company CUI
     issued_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = "issued"  # issued, paid, refunded
+
+# ==================== COMMISSION HELPER ====================
+
+async def get_commission_rate(user_id: str, restaurant_id: str) -> float:
+    """Determine commission rate based on whether customer is new or recurring.
+    Recurring clients: 4.7%, New customers: 7%"""
+    if not db:
+        return COMMISSION_NEW_PERCENTAGE
+    # Check if user has previous completed orders/reservations at this restaurant
+    previous_orders = await db.orders.count_documents({
+        "user_id": user_id,
+        "restaurant_id": restaurant_id,
+        "status": {"$in": ["confirmed", "completed"]}
+    })
+    previous_reservations = await db.reservations.count_documents({
+        "user_id": user_id,
+        "restaurant_id": restaurant_id,
+        "status": {"$in": ["confirmed", "completed"]}
+    })
+    if previous_orders + previous_reservations > 0:
+        return COMMISSION_RECURRING_PERCENTAGE  # 4.7% for recurring
+    return COMMISSION_NEW_PERCENTAGE  # 7% for new
 
 # ==================== AUTH HELPERS ====================
 
@@ -539,6 +585,63 @@ async def create_restaurant_notification(
     )
     await db.restaurant_notifications.insert_one(notification.dict())
     return notification
+
+async def check_reservation_capacity(restaurant_id: str, date: str, time: str):
+    """Check if reservation count exceeds restaurant capacity within timeframe.
+    Sends notification if threshold exceeded."""
+    if not db:
+        return
+    try:
+        # Get capacity settings for this restaurant
+        settings = await db.app_config.find_one({"key": f"capacity_{restaurant_id}"})
+        max_per_hour = 10  # Default
+        notify = True
+        timeframe = 60
+        if settings:
+            max_per_hour = settings.get("max_reservations_per_hour", 10)
+            notify = settings.get("notify_on_capacity", True)
+            timeframe = settings.get("custom_timeframe_minutes", 60)
+        
+        if not notify:
+            return
+        
+        # Count reservations for this restaurant on this date within timeframe
+        reservations = await db.reservations.find(
+            {"restaurant_id": restaurant_id, "date": date}
+        ).to_list(1000)
+        
+        # Parse target time
+        try:
+            target_hour = int(time.split(":")[0])
+            target_min = int(time.split(":")[1])
+        except:
+            return
+        
+        count_in_window = 0
+        for r in reservations:
+            if r.get("status") in ("cancelled",):
+                continue
+            r_time = r.get("time", "")
+            try:
+                r_hour = int(r_time.split(":")[0])
+                r_min = int(r_time.split(":")[1])
+                # Check if within timeframe window
+                diff_minutes = abs((target_hour * 60 + target_min) - (r_hour * 60 + r_min))
+                if diff_minutes <= timeframe:
+                    count_in_window += 1
+            except:
+                continue
+        
+        if count_in_window >= max_per_hour:
+            await create_restaurant_notification(
+                restaurant_id=restaurant_id,
+                notification_type="capacity_alert",
+                title="Alerta capacitate",
+                message=f"Ai {count_in_window} rezervari in intervalul {time} pe {date}. Limita setata: {max_per_hour}.",
+                data={"count": count_in_window, "max": max_per_hour, "date": date, "time": time}
+            )
+    except Exception as e:
+        logger.error(f"Capacity check error: {e}")
 
 async def generate_receipt_number(company_cui: str) -> str:
     """Generate a unique receipt number based on company CUI"""
@@ -1030,6 +1133,9 @@ async def create_reservation(
         message=f"Ai primit o rezervare nouă de la {user.name} pentru {data.date} la {data.time}. {data.guests} persoane.",
         data={"reservation_id": reservation.id}
     )
+    
+    # Check reservation capacity and alert if exceeded
+    await check_reservation_capacity(data.restaurant_id, data.date, data.time)
     
     return {
         "reservation": reservation.dict(),
@@ -2053,7 +2159,9 @@ async def admin_get_stats(user: User = Depends(require_admin)):
         "total_restaurants": total_restaurants,
         "total_reservations": total_reservations,
         "total_transactions": total_transactions,
-        "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE
+        "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
+        "commission_recurring_percentage": COMMISSION_RECURRING_PERCENTAGE,
+        "commission_new_percentage": COMMISSION_NEW_PERCENTAGE
     }
 
 @api_router.get("/admin/restaurants")
@@ -3090,6 +3198,9 @@ async def create_reservation_with_payment(
         data={"reservation_id": reservation.id}
     )
     
+    # Check reservation capacity and alert if exceeded
+    await check_reservation_capacity(data.restaurant_id, data.date, data.time)
+    
     # If free (table_only), skip Stripe and return confirmed directly
     if is_free:
         return {
@@ -3347,6 +3458,50 @@ async def get_payout_summary(user: User = Depends(require_auth)):
         "pending_payout": round(total_payout, 2),  # Simplified - could track actual payments
         "message": f"Comisionul de {PLATFORM_COMMISSION_PERCENTAGE}% este dedus automat din încasări."
     }
+
+# ==================== RESERVATION CAPACITY SETTINGS ====================
+
+class CapacitySettingsUpdate(BaseModel):
+    max_reservations_per_hour: int = 10
+    notify_on_capacity: bool = True
+    custom_timeframe_minutes: int = 60
+
+@api_router.get("/restaurants/{restaurant_id}/capacity-settings")
+async def get_capacity_settings(restaurant_id: str):
+    """Get reservation capacity settings for a restaurant"""
+    settings = await db.app_config.find_one({"key": f"capacity_{restaurant_id}"})
+    if settings:
+        return {
+            "max_reservations_per_hour": settings.get("max_reservations_per_hour", 10),
+            "notify_on_capacity": settings.get("notify_on_capacity", True),
+            "custom_timeframe_minutes": settings.get("custom_timeframe_minutes", 60)
+        }
+    return {
+        "max_reservations_per_hour": 10,
+        "notify_on_capacity": True,
+        "custom_timeframe_minutes": 60
+    }
+
+@api_router.put("/restaurants/{restaurant_id}/capacity-settings")
+async def update_capacity_settings(
+    restaurant_id: str,
+    data: CapacitySettingsUpdate,
+    user: User = Depends(require_auth)
+):
+    """Update reservation capacity settings for a restaurant"""
+    await db.app_config.update_one(
+        {"key": f"capacity_{restaurant_id}"},
+        {"$set": {
+            "key": f"capacity_{restaurant_id}",
+            "restaurant_id": restaurant_id,
+            "max_reservations_per_hour": data.max_reservations_per_hour,
+            "notify_on_capacity": data.notify_on_capacity,
+            "custom_timeframe_minutes": data.custom_timeframe_minutes,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Setarile de capacitate au fost actualizate"}
 
 # ==================== SUPPORT ====================
 
@@ -4366,7 +4521,22 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_seed():
-    """Seed admin user on startup"""
+    """Initialize MySQL and seed admin user on startup"""
+    global db
+    try:
+        db = await init_mysql_pool()
+        logger.info("MySQL database connected")
+    except Exception as e:
+        logger.error(f"MySQL connection error: {e}")
+        # Fallback: try again with localhost for dev
+        try:
+            os.environ['MYSQL_HOST'] = '127.0.0.1'
+            db = await init_mysql_pool()
+            logger.info("MySQL connected via localhost fallback")
+        except Exception as e2:
+            logger.error(f"MySQL fallback also failed: {e2}")
+            return
+    
     try:
         existing_admin = await db.users.find_one({"email": ADMIN_EMAIL})
         if not existing_admin:
@@ -4446,10 +4616,10 @@ async def startup_seed():
                 "owner_user_id": None,
                 "company_id": None,
                 "menu": [
-                    {"id": "m1", "name": "Tartare de vită", "price": 55.0, "quantity": "200g", "description": "Cu avocado și chips de parmezan", "category": "Aperitive", "image_url": "https://images.unsplash.com/photo-1625943553852-781c6dd46faa?w=400"},
-                    {"id": "m2", "name": "Risotto cu trufe", "price": 72.0, "quantity": "350g", "description": "Cu parmezan maturat 24 luni", "category": "Paste", "image_url": "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400"},
-                    {"id": "m3", "name": "Antricot Black Angus", "price": 120.0, "quantity": "400g", "description": "Maturat 28 zile, cu garnitură de sezon", "category": "Principale", "image_url": "https://images.unsplash.com/photo-1558030006-450675393462?w=400"},
-                    {"id": "m4", "name": "Cheesecake cu fructe de pădure", "price": 35.0, "quantity": "1 porție", "description": "Făcut în casă zilnic", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1508737027454-e6454ef45afd?w=400"},
+                    {"id": "m1", "name": "Tartare de vită", "price": 55.0, "quantity": "200g", "description": "Cu avocado și chips de parmezan", "category": "Aperitive", "image_url": "https://images.unsplash.com/photo-1625943553852-781c6dd46faa?w=400", "kcal": 310, "protein": 28.0, "carbs": 4.0, "fats": 20.0, "fiber": 0.5, "ingredients": "Vită proaspătă, avocado, parmezan, capere, ceapă roșie, ulei de măsline, lămâie", "allergens": ["ouă"]},
+                    {"id": "m2", "name": "Risotto cu trufe", "price": 72.0, "quantity": "350g", "description": "Cu parmezan maturat 24 luni", "category": "Paste", "image_url": "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400", "kcal": 520, "protein": 15.0, "carbs": 55.0, "fats": 24.0, "fiber": 3.0, "ingredients": "Orez arborio, trufe negre, parmezan 24 luni, unt, vin alb, ceapă, buillon", "allergens": ["gluten", "lactate"]},
+                    {"id": "m3", "name": "Antricot Black Angus", "price": 120.0, "quantity": "400g", "description": "Maturat 28 zile, cu garnitură de sezon", "category": "Principale", "image_url": "https://images.unsplash.com/photo-1558030006-450675393462?w=400", "kcal": 780, "protein": 52.0, "carbs": 8.0, "fats": 58.0, "fiber": 2.0, "ingredients": "Antricot Black Angus, sare de mare, piper, unt de trufe, sparanghel, roșii cherry", "allergens": ["lactate"]},
+                    {"id": "m4", "name": "Cheesecake cu fructe de pădure", "price": 35.0, "quantity": "1 porție", "description": "Făcut în casă zilnic", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1508737027454-e6454ef45afd?w=400", "kcal": 420, "protein": 8.0, "carbs": 45.0, "fats": 22.0, "fiber": 1.5, "ingredients": "Brânză Philadelphia, biscuiți digestivi, unt, zahăr, afine, zmeură, căpșuni", "allergens": ["gluten", "lactate", "ouă"]},
                 ]
             })
             logger.info("Hamza restaurant seeded")
@@ -4507,9 +4677,168 @@ async def startup_seed():
             })
             logger.info("Hamza floor plan seeded")
         
+        # Seed additional restaurants
+        additional_restaurants = [
+            {
+                "id": "rest_bella_italia",
+                "name": "Bella Italia",
+                "description": "Bucătărie italiană autentică cu paste proaspete făcute zilnic și pizza la cuptor cu lemne.",
+                "address": "Str. Turnului 22, Sibiu",
+                "phone": "+40 269 234 567",
+                "cuisine_type": "Italian",
+                "categories": ["pizza", "Paste"],
+                "price_range": "$$",
+                "opening_hours": "11:00 - 23:00",
+                "rating": 4.6,
+                "review_count": 234,
+                "cover_image": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800",
+                "interior_images": ["https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800"],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7970,
+                "longitude": 24.1520,
+                "is_sponsored": False,
+                "is_new": False,
+                "likes": 312,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "company_id": None,
+                "menu": [
+                    {"id": "bi1", "name": "Pizza Margherita", "price": 38.0, "quantity": "450g", "description": "Sos de roșii San Marzano, mozzarella, busuioc", "category": "Pizza", "image_url": "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400", "kcal": 850, "protein": 32.0, "carbs": 95.0, "fats": 28.0, "fiber": 4.0, "ingredients": "Făină tip 00, roșii San Marzano, mozzarella di bufala, busuioc, ulei de măsline, sare", "allergens": ["gluten", "lactate"]},
+                    {"id": "bi2", "name": "Spaghetti Carbonara", "price": 42.0, "quantity": "350g", "description": "Cu guanciale și pecorino romano", "category": "Paste", "image_url": "https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400", "kcal": 620, "protein": 24.0, "carbs": 58.0, "fats": 32.0, "fiber": 2.0, "ingredients": "Spaghetti, guanciale, pecorino romano, gălbenuș, piper negru", "allergens": ["gluten", "lactate", "ouă"]},
+                    {"id": "bi3", "name": "Tiramisu", "price": 28.0, "quantity": "1 porție", "description": "Rețetă originală cu mascarpone", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400", "kcal": 380, "protein": 6.0, "carbs": 38.0, "fats": 22.0, "fiber": 0.5, "ingredients": "Mascarpone, pișcoturi, cafea espresso, cacao, ouă, zahăr", "allergens": ["gluten", "lactate", "ouă"]}
+                ]
+            },
+            {
+                "id": "rest_sakura_sushi",
+                "name": "Sakura Sushi Bar",
+                "description": "Sushi premium cu pește proaspăt importat din Japonia. Experiență culinară japoneză autentică.",
+                "address": "Piața Mare 8, Sibiu",
+                "phone": "+40 269 345 678",
+                "cuisine_type": "Japonez",
+                "categories": ["sushi", "exclusive"],
+                "price_range": "$$$",
+                "opening_hours": "12:00 - 22:30",
+                "rating": 4.9,
+                "review_count": 189,
+                "cover_image": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800",
+                "interior_images": ["https://images.unsplash.com/photo-1553621042-f6e147245754?w=800"],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7975,
+                "longitude": 24.1510,
+                "is_sponsored": True,
+                "is_new": True,
+                "likes": 567,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "company_id": None,
+                "menu": [
+                    {"id": "ss1", "name": "Salmon Nigiri Set", "price": 65.0, "quantity": "8 buc", "description": "Somon proaspăt din Norvegia pe orez japonez", "category": "Sushi", "image_url": "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400", "kcal": 340, "protein": 28.0, "carbs": 38.0, "fats": 12.0, "fiber": 1.0, "ingredients": "Somon norvegian, orez sushi, oțet de orez, wasabi, ghimbir murat", "allergens": ["pește", "soia"]},
+                    {"id": "ss2", "name": "Dragon Roll", "price": 72.0, "quantity": "8 buc", "description": "Cu țipar, avocado și tobiko", "category": "Sushi", "image_url": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400", "kcal": 420, "protein": 22.0, "carbs": 45.0, "fats": 18.0, "fiber": 3.0, "ingredients": "Țipar, avocado, orez sushi, nori, tobiko, sos unagi, susan", "allergens": ["pește", "soia", "susan"]},
+                    {"id": "ss3", "name": "Ramen Tonkotsu", "price": 48.0, "quantity": "500ml", "description": "Supă cremă de os de porc 12 ore", "category": "Calde", "image_url": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400", "kcal": 580, "protein": 35.0, "carbs": 52.0, "fats": 22.0, "fiber": 3.5, "ingredients": "Os de porc, tăiței ramen, ou fiert, ceapă verde, nori, chashu porc", "allergens": ["gluten", "ouă", "soia"]}
+                ]
+            },
+            {
+                "id": "rest_garden_grill",
+                "name": "Garden Grill & Bar",
+                "description": "Steakuri premium și cocktailuri artizanale într-o grădină de vară superbă.",
+                "address": "Str. Avram Iancu 33, Sibiu",
+                "phone": "+40 269 456 789",
+                "cuisine_type": "Steakhouse",
+                "categories": ["exclusive", "steakhouse_premium"],
+                "price_range": "$$$",
+                "opening_hours": "16:00 - 01:00",
+                "rating": 4.7,
+                "review_count": 167,
+                "cover_image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=800",
+                "interior_images": [],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7990,
+                "longitude": 24.1480,
+                "is_sponsored": False,
+                "is_new": False,
+                "likes": 445,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "company_id": None,
+                "menu": [
+                    {"id": "gg1", "name": "Ribeye 300g", "price": 145.0, "quantity": "300g", "description": "Dry-aged 30 zile cu unt aromat", "category": "Steakuri", "image_url": "https://images.unsplash.com/photo-1558030006-450675393462?w=400", "kcal": 720, "protein": 48.0, "carbs": 2.0, "fats": 56.0, "fiber": 0.0, "ingredients": "Ribeye de vită, unt, usturoi, cimbru, rozmarin, sare de mare, piper", "allergens": ["lactate"]},
+                    {"id": "gg2", "name": "Burger Wagyu", "price": 85.0, "quantity": "250g", "description": "Cu cheddar maturat și bacon crispy", "category": "Burgeri", "image_url": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400", "kcal": 890, "protein": 42.0, "carbs": 35.0, "fats": 58.0, "fiber": 2.5, "ingredients": "Carne Wagyu, cheddar maturat, bacon, salată, roșie, ceapă caramelizată, sos house", "allergens": ["gluten", "lactate"]},
+                    {"id": "gg3", "name": "Caesar Salad", "price": 38.0, "quantity": "300g", "description": "Cu piept de pui și crutoane", "category": "Salate", "image_url": "https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400", "kcal": 340, "protein": 28.0, "carbs": 15.0, "fats": 18.0, "fiber": 4.0, "ingredients": "Salată romană, piept de pui, parmezan, crutoane, sos Caesar, lămâie", "allergens": ["gluten", "lactate", "ouă", "pește"]}
+                ]
+            },
+            {
+                "id": "rest_bucataria_veche",
+                "name": "Bucătăria Veche",
+                "description": "Rețete tradiționale românești moștenite din generație în generație. Mâncarea bunicii la tine la masă.",
+                "address": "Str. Cetății 12, Sibiu",
+                "phone": "+40 269 567 890",
+                "cuisine_type": "Românesc",
+                "categories": ["traditional"],
+                "price_range": "$",
+                "opening_hours": "09:00 - 22:00",
+                "rating": 4.5,
+                "review_count": 298,
+                "cover_image": "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=800",
+                "interior_images": [],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7965,
+                "longitude": 24.1530,
+                "is_sponsored": False,
+                "is_new": False,
+                "likes": 678,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "company_id": None,
+                "menu": [
+                    {"id": "bv1", "name": "Sarmale", "price": 38.0, "quantity": "3 buc + mămăligă", "description": "Sarmale în foi de varză cu smântână și mămăligă", "category": "Principale", "image_url": "https://images.unsplash.com/photo-1623073284788-0d846f75e329?w=400", "kcal": 520, "protein": 22.0, "carbs": 42.0, "fats": 28.0, "fiber": 5.0, "ingredients": "Carne tocată porc și vită, varză murată, orez, ceapă, boia dulce, smântână, mămăligă", "allergens": ["lactate"]},
+                    {"id": "bv2", "name": "Ciorbă de burtă", "price": 25.0, "quantity": "400ml", "description": "Cu smântână și ardei iute", "category": "Supe", "image_url": "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=400", "kcal": 280, "protein": 18.0, "carbs": 12.0, "fats": 16.0, "fiber": 1.5, "ingredients": "Burtă de vită, smântână, oțet, gălbenuș, usturoi, ardei iute", "allergens": ["lactate", "ouă"]},
+                    {"id": "bv3", "name": "Papanași", "price": 28.0, "quantity": "2 buc", "description": "Cu smântână și dulceață de afine", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400", "kcal": 580, "protein": 12.0, "carbs": 65.0, "fats": 28.0, "fiber": 2.0, "ingredients": "Brânză de vaci, făină, ouă, griș, zahăr, smântână, dulceață de afine", "allergens": ["gluten", "lactate", "ouă"]}
+                ]
+            },
+            {
+                "id": "rest_la_terrazza",
+                "name": "La Terrazza",
+                "description": "Restaurant mediteranean cu terasă panoramică și vinuri selecte din toată Europa.",
+                "address": "Pasajul Scărilor 5, Sibiu",
+                "phone": "+40 269 678 901",
+                "cuisine_type": "Mediteranean",
+                "categories": ["exclusive", "fine_dining"],
+                "price_range": "$$$",
+                "opening_hours": "11:00 - 23:30",
+                "rating": 4.8,
+                "review_count": 145,
+                "cover_image": "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=800",
+                "interior_images": ["https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800"],
+                "gallery_images": [],
+                "video_urls": [],
+                "images_3d": [],
+                "latitude": 45.7958,
+                "longitude": 24.1505,
+                "is_sponsored": True,
+                "is_new": True,
+                "likes": 389,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "company_id": None,
+                "menu": [
+                    {"id": "lt1", "name": "Branzino la grătar", "price": 95.0, "quantity": "350g", "description": "Cu legume mediteraneene și sos de lămâie", "category": "Principale", "image_url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400", "kcal": 380, "protein": 42.0, "carbs": 8.0, "fats": 18.0, "fiber": 3.0, "ingredients": "Branzino proaspăt, roșii, măsline Kalamata, capere, lămâie, ulei de măsline, oregano", "allergens": ["pește"]},
+                    {"id": "lt2", "name": "Bruschette Miste", "price": 32.0, "quantity": "4 buc", "description": "Selecție de bruschette cu topping-uri variate", "category": "Aperitive", "image_url": "https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=400", "kcal": 280, "protein": 8.0, "carbs": 32.0, "fats": 14.0, "fiber": 3.0, "ingredients": "Pâine ciabatta, roșii, mozzarella, prosciutto, rucola, ulei de trufe", "allergens": ["gluten", "lactate"]}
+                ]
+            }
+        ]
+        
+        for rest in additional_restaurants:
+            existing = await db.restaurants.find_one({"id": rest["id"]})
+            if not existing:
+                await db.restaurants.insert_one(rest)
+                logger.info(f"Restaurant seeded: {rest['name']}")
+        
     except Exception as e:
         logger.error(f"Startup seed error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    await close_mysql_pool()

@@ -938,42 +938,66 @@ export default function RestaurantDetailScreen() {
                   {/* Nutritional Info */}
                   {selectedMenuItem.kcal && (
                     <View style={styles.nutritionSection}>
-                      <Text style={styles.nutritionTitle}>Valori nutriționale</Text>
+                      <View style={styles.nutritionHeader}>
+                        <Ionicons name="analytics" size={18} color={COLORS.primary} />
+                        <Text style={styles.nutritionTitle}>Valori nutriționale</Text>
+                      </View>
                       <View style={styles.nutritionGrid}>
-                        <View style={styles.nutritionItem}>
-                          <Ionicons name="flame" size={20} color="#FF6B35" />
+                        <View style={[styles.nutritionItem, {backgroundColor: '#FFF3E0'}]}>
+                          <View style={[styles.nutritionIconBg, {backgroundColor: '#FF6B35'}]}>
+                            <Ionicons name="flame" size={18} color="#fff" />
+                          </View>
                           <Text style={styles.nutritionValue}>{selectedMenuItem.kcal}</Text>
                           <Text style={styles.nutritionLabel}>kcal</Text>
                         </View>
                         {selectedMenuItem.protein != null && (
-                          <View style={styles.nutritionItem}>
-                            <Ionicons name="barbell" size={20} color="#00B4D8" />
+                          <View style={[styles.nutritionItem, {backgroundColor: '#E0F7FA'}]}>
+                            <View style={[styles.nutritionIconBg, {backgroundColor: '#00B4D8'}]}>
+                              <Ionicons name="barbell" size={18} color="#fff" />
+                            </View>
                             <Text style={styles.nutritionValue}>{selectedMenuItem.protein}g</Text>
                             <Text style={styles.nutritionLabel}>Proteine</Text>
                           </View>
                         )}
                         {selectedMenuItem.carbs != null && (
-                          <View style={styles.nutritionItem}>
-                            <Ionicons name="leaf" size={20} color="#66BB6A" />
+                          <View style={[styles.nutritionItem, {backgroundColor: '#E8F5E9'}]}>
+                            <View style={[styles.nutritionIconBg, {backgroundColor: '#66BB6A'}]}>
+                              <Ionicons name="leaf" size={18} color="#fff" />
+                            </View>
                             <Text style={styles.nutritionValue}>{selectedMenuItem.carbs}g</Text>
                             <Text style={styles.nutritionLabel}>Carbohidrați</Text>
                           </View>
                         )}
                         {selectedMenuItem.fats != null && (
-                          <View style={styles.nutritionItem}>
-                            <Ionicons name="water" size={20} color="#FFD60A" />
+                          <View style={[styles.nutritionItem, {backgroundColor: '#FFFDE7'}]}>
+                            <View style={[styles.nutritionIconBg, {backgroundColor: '#FFD60A'}]}>
+                              <Ionicons name="water" size={18} color="#fff" />
+                            </View>
                             <Text style={styles.nutritionValue}>{selectedMenuItem.fats}g</Text>
                             <Text style={styles.nutritionLabel}>Grăsimi</Text>
                           </View>
                         )}
                         {selectedMenuItem.fiber != null && (
-                          <View style={styles.nutritionItem}>
-                            <Ionicons name="nutrition" size={20} color="#AB47BC" />
+                          <View style={[styles.nutritionItem, {backgroundColor: '#F3E5F5'}]}>
+                            <View style={[styles.nutritionIconBg, {backgroundColor: '#AB47BC'}]}>
+                              <Ionicons name="nutrition" size={18} color="#fff" />
+                            </View>
                             <Text style={styles.nutritionValue}>{selectedMenuItem.fiber}g</Text>
                             <Text style={styles.nutritionLabel}>Fibre</Text>
                           </View>
                         )}
                       </View>
+                    </View>
+                  )}
+
+                  {/* Ingredients */}
+                  {selectedMenuItem.ingredients && (
+                    <View style={styles.ingredientsSection}>
+                      <View style={styles.ingredientsHeader}>
+                        <Ionicons name="list" size={18} color={COLORS.primary} />
+                        <Text style={styles.ingredientsTitle}>Ingrediente</Text>
+                      </View>
+                      <Text style={styles.ingredientsText}>{selectedMenuItem.ingredients}</Text>
                     </View>
                   )}
 
@@ -1352,11 +1376,16 @@ const styles = StyleSheet.create({
   nutritionSection: {
     marginBottom: SPACING.lg,
   },
+  nutritionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: SPACING.md,
+  },
   nutritionTitle: {
     fontFamily: FONTS.semiBold,
     fontSize: 16,
     color: COLORS.text,
-    marginBottom: SPACING.md,
   },
   nutritionGrid: {
     flexDirection: 'row',
@@ -1364,12 +1393,20 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   nutritionItem: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.sm,
     alignItems: 'center',
     minWidth: 80,
     flex: 1,
+    paddingVertical: 12,
+  },
+  nutritionIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   nutritionValue: {
     fontFamily: FONTS.bold,
@@ -1382,6 +1419,29 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  ingredientsSection: {
+    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+  },
+  ingredientsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: SPACING.sm,
+  },
+  ingredientsTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  ingredientsText: {
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
   allergensSection: {
     marginBottom: SPACING.lg,
