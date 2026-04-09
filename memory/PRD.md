@@ -1,44 +1,42 @@
 # RestaurantApp PRD
 
 ## Original Problem Statement
-Migrate MongoDB to MySQL (phpMyAdmin on VPS 92.113.27.90), fix table number centering on 2D floor plan, change commission from 2.7% to 4.7% recurring / 7% new customers, add nutritional values (kcal, protein, carbs, fats, fiber, ingredients) with icons, add reservation capacity notifications, add more restaurants, provide SQL commands for phpMyAdmin and VPS config, no emergent watermarks, keep Capacitor build for Android.
-
-## Iteration 2 Requirements
-- Dark themed nutrition boxes (matching dark UI, no pastel backgrounds)
-- New ingredient guessing game for kids area
-- Flashier game cards with glow effects, colored borders, larger icons
-- Manual table numbering system for floor plans
+Migrate MongoDB to MySQL (phpMyAdmin on VPS 92.113.27.90), fix table number centering on 2D floor plan, change commission from 2.7% to 4.7% recurring / 7% new customers, add nutritional values with icons, add reservation capacity notifications, add more restaurants, provide SQL commands for phpMyAdmin, VPS config, no emergent watermarks, keep Capacitor build.
 
 ## Architecture
-- **Backend**: FastAPI (Python) with MySQL via aiomysql (JSON-document storage pattern)
+- **Backend**: FastAPI (Python) with MySQL via aiomysql (JSON-document storage)
 - **Frontend**: React Native / Expo with Capacitor for Android
-- **Database**: MySQL (MariaDB compatible) - JSON doc column per table
-- **Auth**: JWT + bcrypt password hashing
-- **Payments**: Stripe integration
-- **VPS**: 92.113.27.90 (production target)
+- **Database**: MySQL/MariaDB - JSON doc column per table
+- **Payments**: Stripe (sk_test_emergent)
+- **VPS Target**: 92.113.27.90
 
 ## What's Been Implemented
 
-### Iteration 1 (April 2026)
-- [x] Full MongoDB to MySQL migration (database.py wrapper with JSON columns)
-- [x] Commission rates: 4.7% recurring, 7% new customers
-- [x] Floor plan table markers centered using transform
-- [x] 5 additional restaurants seeded
-- [x] Nutritional values for all menu items
-- [x] Reservation capacity alert system
-- [x] SQL schema file (schema.sql) for phpMyAdmin
-- [x] VPS setup guide (vps_setup.md)
+### Iteration 1 (MySQL migration, commissions, nutritional values, capacity alerts)
+- [x] Full MongoDB to MySQL migration with aiomysql wrapper
+- [x] Commission: 4.7% recurring, 7% new customers
+- [x] Floor plan markers centered
+- [x] 6 restaurants total (Amza + 5 new)
+- [x] Nutritional values + ingredients on all menus
+- [x] Reservation capacity alerts
+- [x] SQL schema (schema.sql) + VPS guide (vps_setup.md)
 
-### Iteration 2 (April 2026)
-- [x] Dark themed nutrition boxes (COLORS.surface #141414 bg, colored borders)
-- [x] New ingredient guessing game (/kids/guess-ingredient.tsx)
-- [x] Flashier game cards with glow shadows, colored borders, larger icons
-- [x] Updated all existing games (candy-crush, memory, whack) with enhanced visual effects
-- [x] Fixed empty $in SQL query bug in database wrapper
+### Iteration 2 (Dark nutrition boxes, flashier games, ingredient guessing game)
+- [x] Dark themed nutrition boxes matching UI
+- [x] New "Ghiceste Ingredientul" kids game
+- [x] Flashier game cards with glow effects
 
-## Prioritized Backlog
-- P0: Deploy to VPS with MYSQL_HOST=92.113.27.90
+### Iteration 3 (Bug fixes - .env, payments, loyalty, rename)
+- [x] Backend .env confirmed present with all keys
+- [x] Renamed Hamza -> Amza throughout backend + MySQL data
+- [x] Fixed datetime tzinfo crash (MySQL JSON strings)
+- [x] Fixed $inc SIGNED vs DECIMAL for integer values
+- [x] Payments verified working (Stripe checkout URL generated)
+- [x] Loyalty points verified working (award + read + history)
+- [x] Cleaned up duplicate DB entries from rename
+
+## Backlog
+- P0: Deploy to VPS (MYSQL_HOST=92.113.27.90)
 - P1: Company floor plan editor (drag-and-drop table placement)
-- P1: Company dashboard nutritional value input UI
-- P2: Push notification integration for capacity alerts
-- P2: More restaurant floor plans
+- P1: Company nutritional value input dashboard
+- P2: Push notifications for capacity alerts
