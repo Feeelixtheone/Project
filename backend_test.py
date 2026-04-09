@@ -1,350 +1,417 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Restaurant App - MySQL Migration Testing
-Tests the key features mentioned in the review request:
-- 6 restaurants from MySQL
-- Nutritional data in menu items
-- Admin authentication and commission rates
-- Floorplan with 40 tables
-- Capacity settings
+Backend API Testing for Restaurant App - Iteration 3
+Tests all backend functionality including .env file, authentication, restaurants, loyalty points, payments, and admin stats.
 """
 
 import requests
 import sys
+import os
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Public endpoint from the frontend .env
-BACKEND_URL = "https://commission-rates.preview.emergentagent.com"
-
 class RestaurantAPITester:
-    def __init__(self):
+    def __init__(self, base_url="https://commission-rates.preview.emergentagent.com"):
+        self.base_url = base_url
+        self.session_token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.session_token = None
-        self.user_data = None
-        self.admin_email = "mutinyretreat37@gmail.com"
-        self.admin_password = "karaplange2"
-        self.failed_tests = []
-        
-    def log_test(self, test_name: str, success: bool, details: str = ""):
+        self.test_results = []
+
+    def log_test(self, name: str, passed: bool, details: str = "", expected: str = "", actual: str = ""):
+        """Log test result"""
         self.tests_run += 1
-        if success:
+        if passed:
             self.tests_passed += 1
-            print(f"✅ {test_name}: PASSED {details}")
+            print(f"✅ {name}")
         else:
-            print(f"❌ {test_name}: FAILED {details}")
-            self.failed_tests.append({"test": test_name, "details": details})
-            
-    def api_call(self, method: str, endpoint: str, data: Dict[str, Any] = None, 
-                 headers: Dict[str, str] = None, token: str = None) -> tuple:
-        """Make API call and return (success, response_data, status_code)"""
-        url = f"{BACKEND_URL}{endpoint}"
+            print(f"❌ {name}")
+            if details:
+                print(f"   Details: {details}")
+            if expected:
+                print(f"   Expected: {expected}")
+            if actual:
+                print(f"   Actual: {actual}")
         
-        if headers is None:
-            headers = {"Content-Type": "application/json"}
-        
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-            
+        self.test_results.append({
+            "name": name,
+            "passed": passed,
+            "details": details,
+            "expected": expected,
+            "actual": actual
+        })
+
+    def api_request(self, method: str, endpoint: str, data: Dict = None, expected_status: int = 200) -> tuple[bool, Dict]:
+        """Make API request and return (success, response_data)"""
+        url = f"{self.base_url}/api{endpoint}"
+        headers = {'Content-Type': 'application/json'}
+        if self.session_token:
+            headers['Authorization'] = f'Bearer {self.session_token}'
+
         try:
-            if method == "GET":
+            if method == 'GET':
                 response = requests.get(url, headers=headers, timeout=30)
-            elif method == "POST":
+            elif method == 'POST':
                 response = requests.post(url, json=data, headers=headers, timeout=30)
-            elif method == "PUT":
+            elif method == 'PUT':
                 response = requests.put(url, json=data, headers=headers, timeout=30)
-            elif method == "DELETE":
-                response = requests.delete(url, headers=headers, timeout=30)
             else:
-                return False, {"error": f"Unsupported method: {method}"}, 0
-                
-            try:
-                response_data = response.json()
-            except:
-                response_data = {"text": response.text}
-                
-            return response.status_code < 400, response_data, response.status_code
-            
+                return False, {"error": f"Unsupported method: {method}"}
+
+            if response.status_code == expected_status:
+                try:
+                    return True, response.json()
+                except:
+                    return True, {"status": "success", "text": response.text}
+            else:
+                return False, {
+                    "status_code": response.status_code,
+                    "expected": expected_status,
+                    "text": response.text[:500]
+                }
         except Exception as e:
-            return False, {"error": str(e)}, 0
+            return False, {"error": str(e)}
 
-    def test_admin_login(self):
-        """Test POST /api/auth/login with admin credentials"""
-        print(f"\n🔐 Testing Admin Login...")
-        success, data, status = self.api_call(
-            "POST", 
-            "/api/auth/login",
-            {
-                "email": self.admin_email,
-                "password": self.admin_password
-            }
-        )
-        
-        if success and "session_token" in data and "user" in data:
-            self.session_token = data["session_token"]
-            self.user_data = data["user"]
-            # Verify admin role
-            if data["user"].get("role") == "admin" or data["user"].get("email") == self.admin_email:
-                self.log_test("Admin Login", True, 
-                             f"Admin logged in: {data['user']['name']} ({data['user']['email']})")
-                return True
-            else:
-                self.log_test("Admin Login", False, 
-                             f"User logged in but not admin role: {data['user']}")
-                return False
-        else:
-            self.log_test("Admin Login", False, 
-                         f"Status: {status}, Response: {data}")
-            return False
-
-    def test_restaurants_list(self):
-        """Test GET /api/restaurants should return 6 restaurants from MySQL"""
-        print(f"\n🏪 Testing Restaurant List...")
-        success, data, status = self.api_call("GET", "/api/restaurants")
-        
-        if not success:
-            self.log_test("Get Restaurants", False, f"Status: {status}, Response: {data}")
-            return False
-            
-        restaurants = data if isinstance(data, list) else []
-        restaurant_count = len(restaurants)
-        
-        print(f"   Found {restaurant_count} restaurants:")
-        for restaurant in restaurants:
-            name = restaurant.get('name', 'Unknown')
-            print(f"   - {name}")
-            
-        # Check for expected restaurants from review request
-        expected_restaurants = [
-            "Hamza", "Bella Italia", "Sakura Sushi Bar", 
-            "Garden Grill & Bar", "Bucataria Veche", "La Terrazza"
+    def test_env_file_exists(self):
+        """Test 1: Backend .env file exists with all required keys"""
+        env_path = "/app/backend/.env"
+        required_keys = [
+            "MYSQL_HOST", "MYSQL_PORT", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DB",
+            "STRIPE_API_KEY", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD", "EMERGENT_LLM_KEY"
         ]
         
-        found_names = [r.get('name', '') for r in restaurants]
-        
-        if restaurant_count >= 6:
-            self.log_test("Restaurant Count", True, f"Found {restaurant_count} restaurants (expected >= 6)")
-            return True
-        else:
-            self.log_test("Restaurant Count", False, f"Found {restaurant_count} restaurants (expected >= 6)")
-            return False
-
-    def test_hamza_restaurant_nutritional_data(self):
-        """Test GET /api/restaurants/rest_hamza_sibiu should return restaurant with nutritional data"""
-        print(f"\n🍽️ Testing Hamza Restaurant with Nutritional Data...")
-        
-        # Try specific ID first
-        success, data, status = self.api_call("GET", "/api/restaurants/rest_hamza_sibiu")
-        
-        if not success:
-            # Try to find Hamza in the restaurant list
-            list_success, restaurants, _ = self.api_call("GET", "/api/restaurants")
-            if list_success:
-                hamza_restaurant = None
-                for restaurant in restaurants:
-                    if 'hamza' in restaurant.get('name', '').lower():
-                        hamza_restaurant = restaurant
-                        break
-                        
-                if hamza_restaurant:
-                    data = hamza_restaurant
-                    success = True
-                    
-        if not success:
-            self.log_test("Get Hamza Restaurant", False, f"Status: {status}, Response: {data}")
-            return False
+        try:
+            if not os.path.exists(env_path):
+                self.log_test("Backend .env file exists", False, f"File not found at {env_path}")
+                return False
             
-        restaurant_name = data.get('name', 'Unknown')
-        menu = data.get('menu', [])
-        
-        print(f"   Restaurant: {restaurant_name}")
-        print(f"   Menu items: {len(menu)}")
-        
-        # Check for nutritional data in menu items
-        nutritional_items = 0
-        for item in menu:
-            has_nutrition = any([
-                item.get('kcal'),
-                item.get('protein'),
-                item.get('carbs'),
-                item.get('fats'),
-                item.get('fiber'),
-                item.get('ingredients')
-            ])
-            if has_nutrition:
-                nutritional_items += 1
-                print(f"   - {item.get('name')}: {item.get('kcal', 'N/A')} kcal, "
-                      f"protein: {item.get('protein', 'N/A')}g, "
-                      f"carbs: {item.get('carbs', 'N/A')}g")
+            with open(env_path, 'r') as f:
+                env_content = f.read()
+            
+            missing_keys = []
+            for key in required_keys:
+                if f"{key}=" not in env_content:
+                    missing_keys.append(key)
+            
+            if missing_keys:
+                self.log_test("Backend .env file has all required keys", False, 
+                            f"Missing keys: {', '.join(missing_keys)}")
+                return False
+            else:
+                self.log_test("Backend .env file exists with all required keys", True)
+                return True
                 
-        if nutritional_items > 0:
-            self.log_test("Hamza Nutritional Data", True, 
-                         f"Found {nutritional_items} menu items with nutritional data")
-            return True
-        else:
-            self.log_test("Hamza Nutritional Data", False, 
-                         "No menu items found with nutritional data")
+        except Exception as e:
+            self.log_test("Backend .env file exists", False, f"Error reading file: {str(e)}")
             return False
 
-    def test_admin_stats_commission(self):
-        """Test GET /api/admin/stats should return commission rates 4.7% and 7%"""
-        print(f"\n📊 Testing Admin Stats - Commission Rates...")
+    def test_admin_login(self):
+        """Test 2: Admin login with mutinyretreat37@gmail.com / karaplange2"""
+        success, response = self.api_request('POST', '/auth/login', {
+            "email": "mutinyretreat37@gmail.com",
+            "password": "karaplange2"
+        })
         
-        if not self.session_token:
-            self.log_test("Admin Stats", False, "No admin session token available")
+        if success and 'session_token' in response:
+            self.session_token = response['session_token']
+            self.log_test("Admin login successful", True, f"Session token received")
+            return True
+        else:
+            self.log_test("Admin login failed", False, 
+                        f"Response: {json.dumps(response, indent=2)}")
             return False
-            
-        success, data, status = self.api_call("GET", "/api/admin/stats", token=self.session_token)
+
+    def test_restaurants_endpoint(self):
+        """Test 3: GET /api/restaurants returns 6 restaurants with 'Amza' restaurant"""
+        success, response = self.api_request('GET', '/restaurants')
         
         if not success:
-            self.log_test("Admin Stats", False, f"Status: {status}, Response: {data}")
+            self.log_test("GET /api/restaurants failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
             return False
-            
-        # Check commission rates from review request
-        recurring_rate = data.get('commission_recurring_percentage')
-        new_rate = data.get('commission_new_percentage')
         
-        print(f"   Recurring commission: {recurring_rate}%")
-        print(f"   New customer commission: {new_rate}%")
+        if not isinstance(response, list):
+            self.log_test("GET /api/restaurants returns list", False, 
+                        f"Expected list, got {type(response)}")
+            return False
+        
+        # Check count
+        if len(response) != 6:
+            self.log_test("GET /api/restaurants returns 6 restaurants", False, 
+                        f"Expected 6, got {len(response)}")
+            return False
+        
+        # Check for Amza restaurant (not Hamza)
+        amza_found = False
+        hamza_found = False
+        for restaurant in response:
+            if restaurant.get('name') == 'Amza':
+                amza_found = True
+            if restaurant.get('name') == 'Hamza':
+                hamza_found = True
+        
+        if hamza_found:
+            self.log_test("Restaurant name is 'Amza' not 'Hamza'", False, 
+                        "Found 'Hamza' restaurant - should be renamed to 'Amza'")
+            return False
+        
+        if not amza_found:
+            self.log_test("Restaurant 'Amza' exists", False, 
+                        f"Restaurant names found: {[r.get('name') for r in response]}")
+            return False
+        
+        self.log_test("GET /api/restaurants returns 6 restaurants with 'Amza'", True)
+        return True
+
+    def test_amza_restaurant_details(self):
+        """Test 4: GET /api/restaurants/rest_amza_sibiu returns Amza with nutritional data"""
+        success, response = self.api_request('GET', '/restaurants/rest_amza_sibiu')
+        
+        if not success:
+            self.log_test("GET Amza restaurant details failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
+            return False
+        
+        # Check restaurant name
+        if response.get('name') != 'Amza':
+            self.log_test("Amza restaurant name correct", False, 
+                        f"Expected 'Amza', got '{response.get('name')}'")
+            return False
+        
+        # Check nutritional data in menu items
+        menu = response.get('menu', [])
+        if not menu:
+            self.log_test("Amza restaurant has menu items", False, "No menu items found")
+            return False
+        
+        nutritional_fields = ['kcal', 'protein', 'carbs', 'fats', 'fiber', 'ingredients']
+        items_with_nutrition = 0
+        
+        for item in menu:
+            has_nutrition = any(item.get(field) is not None for field in nutritional_fields)
+            if has_nutrition:
+                items_with_nutrition += 1
+        
+        if items_with_nutrition == 0:
+            self.log_test("Amza restaurant has nutritional data", False, 
+                        "No menu items have nutritional information")
+            return False
+        
+        self.log_test("GET Amza restaurant with nutritional data", True, 
+                    f"Found {items_with_nutrition} menu items with nutritional data")
+        return True
+
+    def test_amza_floorplan(self):
+        """Test 5: GET /api/restaurants/rest_amza_sibiu/floorplan returns 40 tables"""
+        success, response = self.api_request('GET', '/restaurants/rest_amza_sibiu/floorplan')
+        
+        if not success:
+            self.log_test("GET Amza floorplan failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
+            return False
+        
+        tables = response.get('tables', [])
+        if len(tables) != 40:
+            self.log_test("Amza floorplan has 40 tables", False, 
+                        f"Expected 40 tables, got {len(tables)}")
+            return False
+        
+        self.log_test("GET Amza floorplan returns 40 tables", True)
+        return True
+
+    def test_loyalty_points(self):
+        """Test 6: GET /api/loyalty/my-points returns points data"""
+        if not self.session_token:
+            self.log_test("Loyalty points test skipped", False, "No session token")
+            return False
+        
+        success, response = self.api_request('GET', '/loyalty/my-points')
+        
+        if not success:
+            self.log_test("GET loyalty points failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
+            return False
+        
+        required_fields = ['total_points', 'lifetime_points', 'level', 'history']
+        missing_fields = [field for field in required_fields if field not in response]
+        
+        if missing_fields:
+            self.log_test("Loyalty points has required fields", False, 
+                        f"Missing fields: {missing_fields}")
+            return False
+        
+        self.log_test("GET loyalty points returns complete data", True)
+        return True
+
+    def test_award_loyalty_points(self):
+        """Test 7: POST /api/loyalty/award-points awards points correctly"""
+        if not self.session_token:
+            self.log_test("Award loyalty points test skipped", False, "No session token")
+            return False
+        
+        # Use query parameters as expected by the API
+        test_order_id = f"test_order_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        url = f"{self.base_url}/api/loyalty/award-points?order_id={test_order_id}&amount=50.0&restaurant_name=Test Restaurant"
+        headers = {'Authorization': f'Bearer {self.session_token}'}
+        
+        try:
+            response = requests.post(url, headers=headers, timeout=30)
+            if response.status_code == 200:
+                self.log_test("POST award loyalty points successful", True)
+                return True
+            else:
+                self.log_test("POST award loyalty points failed", False, 
+                            f"Status: {response.status_code}, Response: {response.text[:200]}")
+                return False
+        except Exception as e:
+            self.log_test("POST award loyalty points failed", False, f"Error: {str(e)}")
+            return False
+
+    def test_create_order_with_stripe(self):
+        """Test 8: POST /api/orders/create returns Stripe checkout_url"""
+        if not self.session_token:
+            self.log_test("Create order test skipped", False, "No session token")
+            return False
+        
+        order_data = {
+            "restaurant_id": "rest_amza_sibiu",
+            "items": [
+                {
+                    "menu_item_id": "item_1", 
+                    "name": "Test Menu Item",
+                    "quantity": 2, 
+                    "price": 25.0,
+                    "image_url": "https://example.com/image.jpg"
+                }
+            ],
+            "origin_url": "https://commission-rates.preview.emergentagent.com"
+        }
+        
+        success, response = self.api_request('POST', '/orders/create', order_data)
+        
+        if not success:
+            self.log_test("POST create order failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
+            return False
+        
+        # Check if payment object contains checkout_url
+        payment = response.get('payment', {})
+        checkout_url = payment.get('checkout_url') or response.get('checkout_url')
+        
+        if not checkout_url:
+            self.log_test("Create order returns checkout_url", False, 
+                        f"No checkout_url found. Response structure: {json.dumps(response, indent=2)[:500]}")
+            return False
+        
+        if not checkout_url.startswith('https://checkout.stripe.com'):
+            self.log_test("Checkout URL is valid Stripe URL", False, 
+                        f"Invalid Stripe URL: {checkout_url}")
+            return False
+        
+        self.log_test("POST create order returns Stripe checkout_url", True)
+        return True
+
+    def test_admin_stats(self):
+        """Test 9: GET /api/admin/stats returns correct commission rates"""
+        if not self.session_token:
+            self.log_test("Admin stats test skipped", False, "No session token")
+            return False
+        
+        success, response = self.api_request('GET', '/admin/stats')
+        
+        if not success:
+            self.log_test("GET admin stats failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
+            return False
         
         expected_recurring = 4.7
         expected_new = 7.0
         
-        if recurring_rate == expected_recurring and new_rate == expected_new:
-            self.log_test("Commission Rates", True, 
-                         f"Correct rates: {recurring_rate}% recurring, {new_rate}% new")
-            return True
-        else:
-            self.log_test("Commission Rates", False, 
-                         f"Expected: {expected_recurring}%/{expected_new}%, Got: {recurring_rate}%/{new_rate}%")
+        actual_recurring = response.get('commission_recurring_percentage')
+        actual_new = response.get('commission_new_percentage')
+        
+        if actual_recurring != expected_recurring:
+            self.log_test("Commission recurring rate is 4.7%", False, 
+                        f"Expected {expected_recurring}, got {actual_recurring}")
             return False
-
-    def test_hamza_floorplan(self):
-        """Test GET /api/restaurants/rest_hamza_sibiu/floorplan should return 40 tables"""
-        print(f"\n🗺️ Testing Hamza Floorplan...")
         
-        success, data, status = self.api_call("GET", "/api/restaurants/rest_hamza_sibiu/floorplan")
-        
-        if not success:
-            self.log_test("Hamza Floorplan", False, f"Status: {status}, Response: {data}")
+        if actual_new != expected_new:
+            self.log_test("Commission new rate is 7.0%", False, 
+                        f"Expected {expected_new}, got {actual_new}")
             return False
-            
-        tables = data.get('tables', [])
-        table_count = len(tables)
         
-        print(f"   Found {table_count} tables in floorplan")
-        
-        if table_count == 40:
-            self.log_test("Hamza Floorplan Tables", True, f"Exactly 40 tables found")
-            return True
-        elif table_count > 0:
-            self.log_test("Hamza Floorplan Tables", True, f"Found {table_count} tables (expected 40)")
-            return True  # Still pass if there are tables, just not exactly 40
-        else:
-            self.log_test("Hamza Floorplan Tables", False, "No tables found in floorplan")
-            return False
+        self.log_test("GET admin stats returns correct commission rates", True)
+        return True
 
     def test_capacity_settings(self):
-        """Test GET /api/restaurants/{restaurant_id}/capacity-settings should return max_reservations_per_hour=10"""
-        print(f"\n⚙️ Testing Capacity Settings...")
-        
-        success, data, status = self.api_call("GET", "/api/restaurants/rest_hamza_sibiu/capacity-settings")
+        """Test 10: GET /api/restaurants/{id}/capacity-settings returns default settings"""
+        success, response = self.api_request('GET', '/restaurants/rest_amza_sibiu/capacity-settings')
         
         if not success:
-            self.log_test("Capacity Settings", False, f"Status: {status}, Response: {data}")
+            self.log_test("GET capacity settings failed", False, 
+                        f"API error: {json.dumps(response, indent=2)}")
             return False
-            
-        max_reservations = data.get('max_reservations_per_hour')
         
-        print(f"   Max reservations per hour: {max_reservations}")
-        
-        if max_reservations == 10:
-            self.log_test("Capacity Settings", True, f"Default setting correct: {max_reservations}")
-            return True
-        else:
-            self.log_test("Capacity Settings", True, f"Setting found: {max_reservations} (expected 10)")
-            return True  # Still pass if setting exists
-
-    def test_backend_health(self):
-        """Test that backend starts without errors and connects to MySQL"""
-        print(f"\n🏥 Testing Backend Health...")
-        
-        # Test basic endpoint that requires database
-        success, data, status = self.api_call("GET", "/api/restaurants")
-        
-        if success:
-            self.log_test("Backend Health", True, "Backend responding and database accessible")
-            return True
-        else:
-            self.log_test("Backend Health", False, f"Backend not responding: {status}")
+        # Should return default capacity settings
+        if 'max_reservations_per_hour' not in response:
+            self.log_test("Capacity settings has max_reservations_per_hour", False, 
+                        f"Response keys: {list(response.keys())}")
             return False
+        
+        self.log_test("GET capacity settings returns default settings", True)
+        return True
 
     def run_all_tests(self):
-        """Run all backend tests for the review request"""
-        print("🚀 Starting Backend API Tests for MySQL Migration...")
-        print(f"   Backend URL: {BACKEND_URL}")
-        print("="*60)
+        """Run all backend tests"""
+        print("🧪 Starting Backend API Tests for Restaurant App")
+        print("=" * 60)
         
-        # Test results
-        results = {
-            "backend_health": self.test_backend_health(),
-            "admin_login": self.test_admin_login(),
-            "restaurants_list": self.test_restaurants_list(),
-            "hamza_nutritional_data": self.test_hamza_restaurant_nutritional_data(),
-            "admin_stats_commission": self.test_admin_stats_commission(),
-            "hamza_floorplan": self.test_hamza_floorplan(),
-            "capacity_settings": self.test_capacity_settings()
-        }
+        # Test 1: .env file
+        self.test_env_file_exists()
         
-        # Summary
-        passed_tests = sum(1 for result in results.values() if result)
-        total_tests = len(results)
-        success_rate = (passed_tests / total_tests) * 100
+        # Test 2: Admin login
+        self.test_admin_login()
         
-        print("\n" + "="*60)
-        print("📊 BACKEND TEST SUMMARY")
-        print("="*60)
-        print(f"Total tests: {total_tests}")
-        print(f"Passed tests: {passed_tests}")
-        print(f"Success rate: {success_rate:.1f}%")
-        print()
+        # Test 3: Restaurants endpoint
+        self.test_restaurants_endpoint()
         
-        for test_name, result in results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
-            print(f"  {test_name}: {status}")
-            
-        if self.failed_tests:
-            print(f"\n❌ FAILED TESTS:")
-            for failure in self.failed_tests:
-                print(f"  - {failure['test']}: {failure['details']}")
-                
-        return {
-            "results": results,
-            "summary": {
-                "total_tests": total_tests,
-                "passed_tests": passed_tests,
-                "success_rate": success_rate,
-                "failed_tests": self.failed_tests
-            }
-        }
+        # Test 4: Amza restaurant details
+        self.test_amza_restaurant_details()
+        
+        # Test 5: Amza floorplan
+        self.test_amza_floorplan()
+        
+        # Test 6: Loyalty points
+        self.test_loyalty_points()
+        
+        # Test 7: Award loyalty points
+        self.test_award_loyalty_points()
+        
+        # Test 8: Create order with Stripe
+        self.test_create_order_with_stripe()
+        
+        # Test 9: Admin stats
+        self.test_admin_stats()
+        
+        # Test 10: Capacity settings
+        self.test_capacity_settings()
+        
+        # Print summary
+        print("\n" + "=" * 60)
+        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} passed")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All tests passed!")
+            return 0
+        else:
+            print(f"❌ {self.tests_run - self.tests_passed} tests failed")
+            return 1
 
 def main():
+    """Main test runner"""
     tester = RestaurantAPITester()
-    test_results = tester.run_all_tests()
-    
-    success_rate = test_results["summary"]["success_rate"]
-    
-    if success_rate >= 80:
-        print(f"\n🎉 Backend tests mostly successful ({success_rate:.1f}%)")
-        return 0
-    elif success_rate >= 50:
-        print(f"\n⚠️ Backend tests partially successful ({success_rate:.1f}%)")
-        return 1
-    else:
-        print(f"\n💥 Backend tests mostly failed ({success_rate:.1f}%)")
-        return 2
+    return tester.run_all_tests()
 
 if __name__ == "__main__":
     sys.exit(main())

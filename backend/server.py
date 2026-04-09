@@ -500,6 +500,16 @@ async def get_commission_rate(user_id: str, restaurant_id: str) -> float:
         return COMMISSION_RECURRING_PERCENTAGE  # 4.7% for recurring
     return COMMISSION_NEW_PERCENTAGE  # 7% for new
 
+def _parse_dt(value) -> datetime:
+    """Safely parse a datetime from MySQL JSON (could be string or datetime)."""
+    if isinstance(value, str):
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+    return datetime.now(timezone.utc)
+
 # ==================== AUTH HELPERS ====================
 
 async def get_session_token(request: Request) -> Optional[str]:
@@ -535,9 +545,7 @@ async def get_current_user(request: Request) -> Optional[User]:
     if not session:
         return None
     
-    expires_at = session["expires_at"]
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    expires_at = _parse_dt(session["expires_at"])
     if expires_at <= datetime.now(timezone.utc):
         return None
     
@@ -1040,9 +1048,7 @@ async def get_reservations(user: User = Depends(require_auth)):
     now = datetime.now(timezone.utc)
     for r in reservations:
         if r.get("reservation_type") == "food_ready" and r.get("cancellation_deadline"):
-            deadline = r["cancellation_deadline"]
-            if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=timezone.utc)
+            deadline = _parse_dt(r["cancellation_deadline"])
             r["can_cancel"] = now < deadline
     
     return reservations
@@ -1166,10 +1172,7 @@ async def cancel_reservation(
     if reservation.get("reservation_type") == "food_ready":
         deadline = reservation.get("cancellation_deadline")
         if deadline:
-            if isinstance(deadline, str):
-                deadline = datetime.fromisoformat(deadline)
-            if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=timezone.utc)
+            deadline = _parse_dt(deadline)
             if datetime.now(timezone.utc) >= deadline:
                 raise HTTPException(
                     status_code=400, 
@@ -4578,13 +4581,13 @@ async def startup_seed():
         await db.users.create_index("email", unique=True)
         await db.users.create_index("user_id", unique=True)
         
-        # Seed "Hamza" restaurant from Sibiu with floor plan
-        hamza_id = "rest_hamza_sibiu"
-        existing_hamza = await db.restaurants.find_one({"id": hamza_id})
-        if not existing_hamza:
+        # Seed "Amza" restaurant from Sibiu with floor plan
+        amza_id = "rest_amza_sibiu"
+        existing_amza = await db.restaurants.find_one({"id": amza_id})
+        if not existing_amza:
             await db.restaurants.insert_one({
-                "id": hamza_id,
-                "name": "Hamza",
+                "id": amza_id,
+                "name": "Amza",
                 "description": "Restaurant de lux în Sibiu cu atmosferă unică și bucătărie internațională. Experiență culinară de top cu o vedere spectaculoasă.",
                 "address": "Str. Nicolae Bălcescu 15, Sibiu",
                 "phone": "+40 269 123 456",
@@ -4622,12 +4625,12 @@ async def startup_seed():
                     {"id": "m4", "name": "Cheesecake cu fructe de pădure", "price": 35.0, "quantity": "1 porție", "description": "Făcut în casă zilnic", "category": "Deserturi", "image_url": "https://images.unsplash.com/photo-1508737027454-e6454ef45afd?w=400", "kcal": 420, "protein": 8.0, "carbs": 45.0, "fats": 22.0, "fiber": 1.5, "ingredients": "Brânză Philadelphia, biscuiți digestivi, unt, zahăr, afine, zmeură, căpșuni", "allergens": ["gluten", "lactate", "ouă"]},
                 ]
             })
-            logger.info("Hamza restaurant seeded")
+            logger.info("Amza restaurant seeded")
         
-        # Seed floor plan for Hamza
-        existing_fp = await db.floor_plans.find_one({"restaurant_id": hamza_id})
+        # Seed floor plan for Amza
+        existing_fp = await db.floor_plans.find_one({"restaurant_id": amza_id})
         if not existing_fp:
-            hamza_tables = [
+            amza_tables = [
                 {"table_number": "1", "x": 57, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
                 {"table_number": "3", "x": 63, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/c8p110if_WhatsApp%20Image%202026-04-09%20at%2000.28.38%20%281%29.jpeg"},
                 {"table_number": "5", "x": 69, "y": 7, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/6v4ghdhn_WhatsApp%20Image%202026-04-09%20at%2000.28.37.jpeg"},
@@ -4670,12 +4673,12 @@ async def startup_seed():
                 {"table_number": "888", "x": 28, "y": 40, "photo_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/tdskduq0_WhatsApp%20Image%202026-04-09%20at%2000.28.38.jpeg"},
             ]
             await db.floor_plans.insert_one({
-                "restaurant_id": hamza_id,
+                "restaurant_id": amza_id,
                 "image_url": "https://customer-assets.emergentagent.com/job_watermark-removal-8/artifacts/o5ayyvch_image.png",
-                "tables": hamza_tables,
+                "tables": amza_tables,
                 "updated_at": datetime.now(timezone.utc)
             })
-            logger.info("Hamza floor plan seeded")
+            logger.info("Amza floor plan seeded")
         
         # Seed additional restaurants
         additional_restaurants = [

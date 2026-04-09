@@ -129,10 +129,16 @@ def _build_update_sql(update: dict) -> Tuple[str, list]:
 
     if "$inc" in update:
         for key, value in update["$inc"].items():
-            set_parts.append(
-                f"doc = JSON_SET(doc, '$.{key}', "
-                f"COALESCE(CAST(JSON_EXTRACT(doc, '$.{key}') AS DECIMAL(20,4)), 0) + %s)"
-            )
+            if isinstance(value, int):
+                set_parts.append(
+                    f"doc = JSON_SET(doc, '$.{key}', "
+                    f"COALESCE(CAST(JSON_EXTRACT(doc, '$.{key}') AS SIGNED), 0) + %s)"
+                )
+            else:
+                set_parts.append(
+                    f"doc = JSON_SET(doc, '$.{key}', "
+                    f"COALESCE(CAST(JSON_EXTRACT(doc, '$.{key}') AS DECIMAL(20,2)), 0) + %s)"
+                )
             params.append(value)
 
     if "$setOnInsert" in update:
