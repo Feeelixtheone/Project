@@ -180,9 +180,8 @@ export default function RezervariScreen() {
 
       const result = await createReservationWithPayment(reservationData);
       
-      // Open Stripe checkout
+      // Open Stripe checkout for paid reservations
       if (result.payment?.checkout_url) {
-        // Redirect to Stripe checkout
         if (typeof window !== 'undefined') {
           window.location.href = result.payment.checkout_url;
         } else {
@@ -190,6 +189,14 @@ export default function RezervariScreen() {
           if (supported) {
             await Linking.openURL(result.payment.checkout_url);
           }
+        }
+      } else {
+        // Free reservation (table_only) - show success
+        const msg = 'Rezervarea ta a fost confirmată! Plata se face la restaurant.';
+        if (typeof window !== 'undefined') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Succes', msg);
         }
       }
       

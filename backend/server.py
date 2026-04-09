@@ -974,15 +974,15 @@ async def create_reservation(
     
     # Get upfront fee for table_only reservations
     upfront_fee = 0.0
-    if data.reservation_type == "table_only":
-        upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
+    # table_only: free reservation, tracked in-app so restaurants can't bypass
+    # food_ready: customer pays food total through app
     
-    # Calculate platform commission (2.7%) - deducted from restaurant, NOT charged to user
-    base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
+    # Calculate platform commission (2.7%) - silently deducted from restaurant payout
+    base_amount = food_total if data.reservation_type == "food_ready" else 0.0
     platform_commission = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-    # User pays only the base amount (no commission)
+    # Customer pays only the food/base amount
     total_paid = base_amount
-    # Restaurant receives base amount minus commission
+    # Restaurant receives amount minus commission
     restaurant_payout = round(base_amount - platform_commission, 2)
     
     # Calculate cancellation deadline for food_ready (1 hour before)
@@ -1036,14 +1036,10 @@ async def create_reservation(
         "payment_summary": {
             "reservation_type": data.reservation_type,
             "food_total": food_total,
-            "upfront_fee": upfront_fee,
             "total_paid": total_paid,
-            "platform_commission": platform_commission,
-            "platform_commission_percentage": PLATFORM_COMMISSION_PERCENTAGE,
-            "restaurant_payout": restaurant_payout,
             "can_cancel": can_cancel,
             "cancellation_deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
-            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Taxa în avans va fi dedusă din nota finală."
+            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Rezervarea ta a fost confirmată. Plata se face la restaurant."
         }
     }
 
@@ -1094,15 +1090,15 @@ async def cancel_reservation(
 
 @api_router.get("/restaurants/{restaurant_id}/upfront-fee")
 async def get_upfront_fee(restaurant_id: str):
-    """Get restaurant's upfront fee for table reservations"""
+    """Get restaurant's upfront fee for table reservations - now free"""
     restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant negăsit")
     
     return {
-        "upfront_fee": restaurant.get("upfront_fee", 20.0),
+        "upfront_fee": 0,
         "currency": "RON",
-        "note": "Această sumă va fi dedusă din nota finală."
+        "note": "Rezervarea este gratuită. Plata se face la restaurant."
     }
 
 # ==================== CHAT/SUPPORT ROUTES ====================
@@ -3038,13 +3034,13 @@ async def create_reservation_with_payment(
     
     # Get upfront fee for table_only reservations
     upfront_fee = 0.0
-    if data.reservation_type == "table_only":
-        upfront_fee = restaurant.get("upfront_fee", 20.0)  # Default 20 RON
+    # table_only: free reservation, tracked in-app
+    # food_ready: customer pays food total through app
     
-    # Determine payment amount - User pays base_amount only, commission deducted from restaurant
-    base_amount = food_total if data.reservation_type == "food_ready" else upfront_fee
+    # Determine payment amount - commission silently deducted from restaurant
+    base_amount = food_total if data.reservation_type == "food_ready" else 0.0
     platform_fee = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
-    total_to_pay = base_amount  # User pays only the base amount, NO commission
+    total_to_pay = base_amount
     restaurant_payout = round(base_amount - platform_fee, 2)
     
     # Calculate cancellation deadline for food_ready (1 hour before)
@@ -3059,7 +3055,8 @@ async def create_reservation_with_payment(
         except:
             pass
     
-    # Create reservation with pending payment status
+    # Create reservation
+    is_free = total_to_pay <= 0
     reservation = Reservation(
         restaurant_id=data.restaurant_id,
         restaurant_name=restaurant["name"],
@@ -3077,10 +3074,10 @@ async def create_reservation_with_payment(
         platform_commission=platform_fee,
         total_paid=total_to_pay,
         restaurant_payout=restaurant_payout,
-        is_paid=False,
+        is_paid=is_free,
         can_cancel=can_cancel,
         cancellation_deadline=cancellation_deadline,
-        status="pending_payment"
+        status="confirmed" if is_free else "pending_payment"
     )
     await db.reservations.insert_one(reservation.dict())
     
@@ -3088,12 +3085,24 @@ async def create_reservation_with_payment(
     await create_restaurant_notification(
         restaurant_id=data.restaurant_id,
         notification_type="new_reservation",
-        title="Rezervare nouă cu plată",
+        title="Rezervare nouă",
         message=f"Ai primit o rezervare nouă de la {user.name} pentru {data.date} la {data.time}. {data.guests} persoane. Tip: {'Cu mâncare gata' if data.reservation_type == 'food_ready' else 'Doar masă'}.",
         data={"reservation_id": reservation.id}
     )
     
-    # Create Stripe checkout session
+    # If free (table_only), skip Stripe and return confirmed directly
+    if is_free:
+        return {
+            "reservation": reservation.dict(),
+            "payment": None,
+            "cancellation_info": {
+                "can_cancel": can_cancel,
+                "deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
+                "note": "Rezervarea ta a fost confirmată. Plata se face la restaurant."
+            }
+        }
+    
+    # Create Stripe checkout session for food_ready
     host_url = str(request.base_url).rstrip('/')
     webhook_url = f"{host_url}/api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
@@ -3147,15 +3156,13 @@ async def create_reservation_with_payment(
         "payment": {
             "checkout_url": session.url,
             "session_id": session.session_id,
-            "base_amount": base_amount,
-            "platform_fee": platform_fee,
             "total": total_to_pay,
             "currency": "RON"
         },
         "cancellation_info": {
             "can_cancel": can_cancel,
             "deadline": cancellation_deadline.isoformat() if cancellation_deadline else None,
-            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Taxa în avans va fi dedusă din nota finală."
+            "note": "Rezervările cu mâncare gata făcută nu pot fi anulate cu mai puțin de 1 oră înainte." if data.reservation_type == "food_ready" else "Rezervarea ta a fost confirmată."
         }
     }
 
