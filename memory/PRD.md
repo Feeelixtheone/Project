@@ -1,28 +1,53 @@
 # RestaurantApp PRD
 
 ## Original Problem Statement
-1. Remove all emergent.sh watermarks, construct APK with Capacitor
-2. Remove Google login (beta), keep business/user options
-3. Admin: mutinyretreat37@gmail.com logs in as admin
-4. Add kill switch for admin to protect app
-5. Create "Hamza" restaurant from Sibiu with 2D floor plan
-6. Interactive table markers - click table number to see photo
-7. Business owners: upload 2D image, AI detects table numbers, assign photos
-8. Remove 20 lei fee for customer, hide restaurant tax/commission from customer interface
-9. Food ready: pay through app. Table only: free but tracked in app
+Migrate MongoDB to MySQL (phpMyAdmin on VPS 92.113.27.90), fix table number centering on 2D floor plan, change commission from 2.7% to 4.7% recurring / 7% new customers, add nutritional values (kcal, protein, carbs, fats, fiber, ingredients) with icons, add reservation capacity notifications, add more restaurants, provide SQL commands for phpMyAdmin and VPS config, no emergent watermarks, keep Capacitor build for Android.
 
-## What's Been Implemented (Apr 8, 2026)
-- JWT email/password auth (replaced Google OAuth)
-- Admin seeded (mutinyretreat37@gmail.com / karaplange2)
-- Kill switch (lock/unlock/wipe)
-- Hamza restaurant with 40-table floor plan
-- AI table detection (GPT-4o vision)
-- Capacitor Android project
-- **Removed 20 RON fee**: table_only = free, confirmed instantly
-- **food_ready**: pays food total via Stripe, no commission shown
-- **Hidden all commission/fee info from customer UI**
-- Commission silently deducted from restaurant payout on backend only
+## Architecture
+- **Backend**: FastAPI (Python) with MySQL via aiomysql (JSON-document storage pattern)
+- **Frontend**: React Native / Expo with Capacitor for Android
+- **Database**: MySQL (MariaDB compatible) - JSON doc column per table
+- **Auth**: JWT + bcrypt password hashing
+- **Payments**: Stripe integration
+- **VPS**: 92.113.27.90 (production target)
 
-## Backlog
-- P1: Build APK locally
+## User Personas
+- Restaurant owners (manage menus, floor plans, reservations)
+- End users (browse restaurants, make reservations, order food)
+- Companies (manage stores, products, receipts)
+- Admin (platform management, commission control)
+
+## Core Requirements
+- Multi-restaurant platform with floor plans
+- Commission-based business model (4.7% recurring, 7% new)
+- Nutritional values for all menu items
+- Reservation capacity alerts
+- Android APK via Capacitor
+
+## What's Been Implemented (April 2026)
+- [x] Full MongoDB → MySQL migration (database.py wrapper with JSON columns)
+- [x] Commission rates updated: 4.7% recurring, 7% new customers
+- [x] Floor plan table markers centered using transform (was margin offset)
+- [x] 5 additional restaurants seeded (Bella Italia, Sakura Sushi, Garden Grill, Bucataria Veche, La Terrazza)
+- [x] Nutritional values added to all menu items (kcal, protein, carbs, fats, fiber, ingredients)
+- [x] Enhanced nutritional display with colored icons in restaurant detail
+- [x] Ingredients section added to menu item detail view
+- [x] Reservation capacity alert system (checks per-hour threshold, notifies restaurant)
+- [x] Capacity settings API (GET/PUT per restaurant, defaults to 10/hour)
+- [x] SQL schema file (schema.sql) for phpMyAdmin import
+- [x] VPS setup guide (vps_setup.md) with MySQL, Nginx, systemd config
+- [x] StoreProduct model updated with nutritional fields
+- [x] All backend tests passing (100%)
+
+## Prioritized Backlog
+- P0: Change MYSQL_HOST to 92.113.27.90 for VPS deployment
+- P1: Add floor plans for additional restaurants
+- P1: Company dashboard nutritional value input UI
+- P2: Push notification integration for capacity alerts
 - P2: Password reset, email verification
+- P2: Multi-language support
+
+## Next Tasks
+1. Deploy to VPS and test MySQL connection at 92.113.27.90
+2. Import schema.sql via phpMyAdmin
+3. Build Android APK with Capacitor (npx cap sync android && cd android && ./gradlew assembleRelease)

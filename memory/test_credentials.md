@@ -1,15 +1,20 @@
 # Test Credentials
 
 ## Admin Account
-- **Email**: mutinyretreat37@gmail.com
-- **Password**: karaplange2
-- **Role**: admin (full access - kill switch, wipe, lock/unlock)
+- Email: mutinyretreat37@gmail.com
+- Password: karaplange2
+- Role: admin
 
-## Business Test Account (seeded)
-- **Email**: business@restaurant.ro
-- **Password**: business123
-- **Role**: business user
+## MySQL Database (Preview/Local)
+- Host: 127.0.0.1
+- Port: 3306
+- User: restaurant_app
+- Password: AlphaWRHED12@_
+- Database: restaurant_app
 
-## Default Test User Registration
-- Use any email to register via /api/auth/register
-- Password must be at least 6 characters
+## MySQL Database (VPS Production)
+- Host: 92.113.27.90
+- Port: 3306
+- User: restaurant_app
+- Password: AlphaWRHED12@_
+- Database: restaurant_app
