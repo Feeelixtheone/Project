@@ -65,9 +65,12 @@ def _build_where(query: dict) -> Tuple[str, list]:
             for op, op_val in value.items():
                 json_path = f"JSON_UNQUOTE(JSON_EXTRACT(doc, '$.{key}'))"
                 if op == "$in":
-                    placeholders = ", ".join(["%s"] * len(op_val))
-                    clauses.append(f"{json_path} IN ({placeholders})")
-                    params.extend([str(v) for v in op_val])
+                    if not op_val:
+                        clauses.append("1=0")  # Empty IN means no match
+                    else:
+                        placeholders = ", ".join(["%s"] * len(op_val))
+                        clauses.append(f"{json_path} IN ({placeholders})")
+                        params.extend([str(v) for v in op_val])
                 elif op == "$ne":
                     clauses.append(f"({json_path} != %s OR {json_path} IS NULL)")
                     params.append(str(op_val))

@@ -943,7 +943,7 @@ export default function RestaurantDetailScreen() {
                         <Text style={styles.nutritionTitle}>Valori nutriționale</Text>
                       </View>
                       <View style={styles.nutritionGrid}>
-                        <View style={[styles.nutritionItem, {backgroundColor: '#FFF3E0'}]}>
+                        <View style={[styles.nutritionItem, {borderColor: '#FF6B35'}]}>
                           <View style={[styles.nutritionIconBg, {backgroundColor: '#FF6B35'}]}>
                             <Ionicons name="flame" size={18} color="#fff" />
                           </View>
@@ -951,7 +951,7 @@ export default function RestaurantDetailScreen() {
                           <Text style={styles.nutritionLabel}>kcal</Text>
                         </View>
                         {selectedMenuItem.protein != null && (
-                          <View style={[styles.nutritionItem, {backgroundColor: '#E0F7FA'}]}>
+                          <View style={[styles.nutritionItem, {borderColor: '#00B4D8'}]}>
                             <View style={[styles.nutritionIconBg, {backgroundColor: '#00B4D8'}]}>
                               <Ionicons name="barbell" size={18} color="#fff" />
                             </View>
@@ -960,7 +960,7 @@ export default function RestaurantDetailScreen() {
                           </View>
                         )}
                         {selectedMenuItem.carbs != null && (
-                          <View style={[styles.nutritionItem, {backgroundColor: '#E8F5E9'}]}>
+                          <View style={[styles.nutritionItem, {borderColor: '#66BB6A'}]}>
                             <View style={[styles.nutritionIconBg, {backgroundColor: '#66BB6A'}]}>
                               <Ionicons name="leaf" size={18} color="#fff" />
                             </View>
@@ -969,7 +969,7 @@ export default function RestaurantDetailScreen() {
                           </View>
                         )}
                         {selectedMenuItem.fats != null && (
-                          <View style={[styles.nutritionItem, {backgroundColor: '#FFFDE7'}]}>
+                          <View style={[styles.nutritionItem, {borderColor: '#FFD60A'}]}>
                             <View style={[styles.nutritionIconBg, {backgroundColor: '#FFD60A'}]}>
                               <Ionicons name="water" size={18} color="#fff" />
                             </View>
@@ -978,7 +978,7 @@ export default function RestaurantDetailScreen() {
                           </View>
                         )}
                         {selectedMenuItem.fiber != null && (
-                          <View style={[styles.nutritionItem, {backgroundColor: '#F3E5F5'}]}>
+                          <View style={[styles.nutritionItem, {borderColor: '#AB47BC'}]}>
                             <View style={[styles.nutritionIconBg, {backgroundColor: '#AB47BC'}]}>
                               <Ionicons name="nutrition" size={18} color="#fff" />
                             </View>
@@ -1393,12 +1393,15 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   nutritionItem: {
+    backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.sm,
     alignItems: 'center',
     minWidth: 80,
     flex: 1,
     paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   nutritionIconBg: {
     width: 32,

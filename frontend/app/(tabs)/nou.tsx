@@ -26,6 +26,7 @@ const GAMES = [
     icon: 'pizza',
     color: '#FF6B35',
     route: '/kids/candy-crush',
+    glow: '#FF6B3540',
   },
   {
     id: 'memory',
@@ -34,6 +35,7 @@ const GAMES = [
     icon: 'grid',
     color: '#00B4D8',
     route: '/kids/memory',
+    glow: '#00B4D840',
   },
   {
     id: 'whack',
@@ -42,6 +44,16 @@ const GAMES = [
     icon: 'hand-left',
     color: '#4CAF50',
     route: '/kids/whack',
+    glow: '#4CAF5040',
+  },
+  {
+    id: 'guess-ingredient',
+    title: 'Ghicește Ingredientul',
+    description: 'Poți ghici ingredientele corecte ale mâncării?',
+    icon: 'help-circle',
+    color: '#AB47BC',
+    route: '/kids/guess-ingredient',
+    glow: '#AB47BC40',
   },
 ];
 
@@ -132,12 +144,12 @@ export default function NouScreen() {
         return (
           <TouchableOpacity
             key={game.id}
-            style={styles.gameCard}
+            style={[styles.gameCard, { borderColor: game.color + '60', shadowColor: game.color }]}
             onPress={() => router.push(game.route as any)}
             activeOpacity={0.85}
           >
-            <View style={[styles.gameIconContainer, { backgroundColor: game.color + '25' }]}>
-              <Ionicons name={game.icon as any} size={40} color={game.color} />
+            <View style={[styles.gameIconContainer, { backgroundColor: game.color + '20', borderColor: game.color + '50', borderWidth: 2 }]}>
+              <Ionicons name={game.icon as any} size={44} color={game.color} />
             </View>
             <View style={styles.gameInfo}>
               <Text style={styles.gameTitle}>{game.title}</Text>
@@ -149,8 +161,8 @@ export default function NouScreen() {
                 </View>
               )}
             </View>
-            <View style={[styles.playBtn, { backgroundColor: game.color }]}>
-              <Ionicons name="play" size={20} color="#FFF" />
+            <View style={[styles.playBtn, { backgroundColor: game.color, shadowColor: game.color }]}>
+              <Ionicons name="play" size={22} color="#FFF" />
             </View>
           </TouchableOpacity>
         );
@@ -335,25 +347,34 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   gameIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 68,
+    height: 68,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   gameInfo: { flex: 1, marginLeft: SPACING.md },
-  gameTitle: { fontFamily: FONTS.bold, fontSize: 17, color: COLORS.text },
-  gameDescription: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
+  gameTitle: { fontFamily: FONTS.bold, fontSize: 18, color: COLORS.text },
+  gameDescription: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.textSecondary, marginTop: 3 },
   highScoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   highScoreText: { fontFamily: FONTS.semiBold, fontSize: 12, color: COLORS.gold },
   playBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });
