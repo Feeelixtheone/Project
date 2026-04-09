@@ -3,6 +3,12 @@
 ## Original Problem Statement
 Migrate MongoDB to MySQL (phpMyAdmin on VPS 92.113.27.90), fix table number centering on 2D floor plan, change commission from 2.7% to 4.7% recurring / 7% new customers, add nutritional values (kcal, protein, carbs, fats, fiber, ingredients) with icons, add reservation capacity notifications, add more restaurants, provide SQL commands for phpMyAdmin and VPS config, no emergent watermarks, keep Capacitor build for Android.
 
+## Iteration 2 Requirements
+- Dark themed nutrition boxes (matching dark UI, no pastel backgrounds)
+- New ingredient guessing game for kids area
+- Flashier game cards with glow effects, colored borders, larger icons
+- Manual table numbering system for floor plans
+
 ## Architecture
 - **Backend**: FastAPI (Python) with MySQL via aiomysql (JSON-document storage pattern)
 - **Frontend**: React Native / Expo with Capacitor for Android
@@ -11,43 +17,28 @@ Migrate MongoDB to MySQL (phpMyAdmin on VPS 92.113.27.90), fix table number cent
 - **Payments**: Stripe integration
 - **VPS**: 92.113.27.90 (production target)
 
-## User Personas
-- Restaurant owners (manage menus, floor plans, reservations)
-- End users (browse restaurants, make reservations, order food)
-- Companies (manage stores, products, receipts)
-- Admin (platform management, commission control)
+## What's Been Implemented
 
-## Core Requirements
-- Multi-restaurant platform with floor plans
-- Commission-based business model (4.7% recurring, 7% new)
-- Nutritional values for all menu items
-- Reservation capacity alerts
-- Android APK via Capacitor
+### Iteration 1 (April 2026)
+- [x] Full MongoDB to MySQL migration (database.py wrapper with JSON columns)
+- [x] Commission rates: 4.7% recurring, 7% new customers
+- [x] Floor plan table markers centered using transform
+- [x] 5 additional restaurants seeded
+- [x] Nutritional values for all menu items
+- [x] Reservation capacity alert system
+- [x] SQL schema file (schema.sql) for phpMyAdmin
+- [x] VPS setup guide (vps_setup.md)
 
-## What's Been Implemented (April 2026)
-- [x] Full MongoDB → MySQL migration (database.py wrapper with JSON columns)
-- [x] Commission rates updated: 4.7% recurring, 7% new customers
-- [x] Floor plan table markers centered using transform (was margin offset)
-- [x] 5 additional restaurants seeded (Bella Italia, Sakura Sushi, Garden Grill, Bucataria Veche, La Terrazza)
-- [x] Nutritional values added to all menu items (kcal, protein, carbs, fats, fiber, ingredients)
-- [x] Enhanced nutritional display with colored icons in restaurant detail
-- [x] Ingredients section added to menu item detail view
-- [x] Reservation capacity alert system (checks per-hour threshold, notifies restaurant)
-- [x] Capacity settings API (GET/PUT per restaurant, defaults to 10/hour)
-- [x] SQL schema file (schema.sql) for phpMyAdmin import
-- [x] VPS setup guide (vps_setup.md) with MySQL, Nginx, systemd config
-- [x] StoreProduct model updated with nutritional fields
-- [x] All backend tests passing (100%)
+### Iteration 2 (April 2026)
+- [x] Dark themed nutrition boxes (COLORS.surface #141414 bg, colored borders)
+- [x] New ingredient guessing game (/kids/guess-ingredient.tsx)
+- [x] Flashier game cards with glow shadows, colored borders, larger icons
+- [x] Updated all existing games (candy-crush, memory, whack) with enhanced visual effects
+- [x] Fixed empty $in SQL query bug in database wrapper
 
 ## Prioritized Backlog
-- P0: Change MYSQL_HOST to 92.113.27.90 for VPS deployment
-- P1: Add floor plans for additional restaurants
+- P0: Deploy to VPS with MYSQL_HOST=92.113.27.90
+- P1: Company floor plan editor (drag-and-drop table placement)
 - P1: Company dashboard nutritional value input UI
 - P2: Push notification integration for capacity alerts
-- P2: Password reset, email verification
-- P2: Multi-language support
-
-## Next Tasks
-1. Deploy to VPS and test MySQL connection at 92.113.27.90
-2. Import schema.sql via phpMyAdmin
-3. Build Android APK with Capacitor (npx cap sync android && cd android && ./gradlew assembleRelease)
+- P2: More restaurant floor plans
