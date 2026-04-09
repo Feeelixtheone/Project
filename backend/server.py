@@ -2688,7 +2688,8 @@ async def create_direct_order(
     subtotal = sum(item.price * item.quantity for item in data.items)
     discount_amount = round(subtotal * (rotw_discount / 100), 2) if rotw_discount > 0 else 0.0
     subtotal_after_discount = round(subtotal - discount_amount, 2)
-    platform_fee = round(subtotal_after_discount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
+    actual_commission = await get_commission_rate(user.user_id, data.restaurant_id)
+    platform_fee = round(subtotal_after_discount * (actual_commission / 100), 2)
     restaurant_payout = round(subtotal_after_discount - platform_fee, 2)
     total = subtotal_after_discount  # User pays discounted subtotal
     
@@ -2929,12 +2930,85 @@ async def get_checkout_status(session_id: str, request: Request):
                     }
                 )
                 
-                # If payment successful, create/confirm reservation
+                # If payment successful, update orders/reservations and award loyalty points
                 if new_payment_status == "paid" and not existing_tx.get("reservation_confirmed"):
                     await db.payment_transactions.update_one(
                         {"session_id": session_id},
                         {"$set": {"reservation_confirmed": True}}
                     )
+                    
+                    metadata = existing_tx.get("metadata", {})
+                    tx_type = metadata.get("type", "")
+                    restaurant_id = metadata.get("restaurant_id", "")
+                    restaurant_name = metadata.get("restaurant_name", "")
+                    user_id = metadata.get("user_id", "")
+                    total_amount = existing_tx.get("amount", 0)
+                    
+                    if tx_type == "direct_order":
+                        order_id = metadata.get("order_id", "")
+                        if order_id:
+                            await db.orders.update_one(
+                                {"id": order_id},
+                                {"$set": {"status": "confirmed", "paid_at": datetime.now(timezone.utc).isoformat()}}
+                            )
+                            # Award loyalty points
+                            points = int(total_amount * POINTS_PER_RON)
+                            if points > 0 and user_id:
+                                existing_pts = await db.loyalty_history.find_one({"order_id": order_id, "user_id": user_id})
+                                if not existing_pts:
+                                    await db.loyalty_points.update_one(
+                                        {"user_id": user_id},
+                                        {
+                                            "$inc": {"total_points": points, "lifetime_points": points},
+                                            "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
+                                        },
+                                        upsert=True
+                                    )
+                                    await db.loyalty_history.insert_one({
+                                        "id": str(uuid.uuid4()),
+                                        "user_id": user_id,
+                                        "order_id": order_id,
+                                        "points": points,
+                                        "amount_spent": total_amount,
+                                        "restaurant_name": restaurant_name,
+                                        "type": "earned",
+                                        "description": f"+{points} puncte pentru comanda de {total_amount} RON la {restaurant_name}",
+                                        "created_at": datetime.now(timezone.utc).isoformat()
+                                    })
+                                    logger.info(f"Loyalty points awarded via checkout status: {points} to {user_id}")
+                    
+                    elif tx_type == "reservation":
+                        reservation_id = metadata.get("reservation_id", "")
+                        if reservation_id:
+                            await db.reservations.update_one(
+                                {"id": reservation_id},
+                                {"$set": {"status": "confirmed", "is_paid": True, "paid_at": datetime.now(timezone.utc).isoformat()}}
+                            )
+                            # Award loyalty points for reservation
+                            points = int(total_amount * POINTS_PER_RON)
+                            if points > 0 and user_id:
+                                existing_pts = await db.loyalty_history.find_one({"order_id": reservation_id, "user_id": user_id})
+                                if not existing_pts:
+                                    await db.loyalty_points.update_one(
+                                        {"user_id": user_id},
+                                        {
+                                            "$inc": {"total_points": points, "lifetime_points": points},
+                                            "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
+                                        },
+                                        upsert=True
+                                    )
+                                    await db.loyalty_history.insert_one({
+                                        "id": str(uuid.uuid4()),
+                                        "user_id": user_id,
+                                        "order_id": reservation_id,
+                                        "points": points,
+                                        "amount_spent": total_amount,
+                                        "restaurant_name": restaurant_name,
+                                        "type": "earned",
+                                        "description": f"+{points} puncte pentru rezervare de {total_amount} RON la {restaurant_name}",
+                                        "created_at": datetime.now(timezone.utc).isoformat()
+                                    })
+                                    logger.info(f"Loyalty points awarded via reservation: {points} to {user_id}")
         
         return {
             "session_id": session_id,
@@ -3148,9 +3222,10 @@ async def create_reservation_with_payment(
     # table_only: free reservation, tracked in-app
     # food_ready: customer pays food total through app
     
-    # Determine payment amount - commission silently deducted from restaurant
+    # Determine payment amount - commission rate based on new vs recurring customer
+    actual_commission = await get_commission_rate(user.user_id, data.restaurant_id)
     base_amount = food_total if data.reservation_type == "food_ready" else 0.0
-    platform_fee = round(base_amount * (PLATFORM_COMMISSION_PERCENTAGE / 100), 2)
+    platform_fee = round(base_amount * (actual_commission / 100), 2)
     total_to_pay = base_amount
     restaurant_payout = round(base_amount - platform_fee, 2)
     
@@ -3230,6 +3305,7 @@ async def create_reservation_with_payment(
         "reservation_id": reservation.id,
         "restaurant_id": data.restaurant_id,
         "restaurant_name": restaurant["name"],
+        "type": "reservation",
         "reservation_type": data.reservation_type,
         "platform_fee": str(platform_fee)
     }
@@ -3310,7 +3386,7 @@ async def confirm_reservation_payment(
                 "$set": {
                     "is_paid": True,
                     "status": "confirmed",
-                    "payment_confirmed_at": datetime.now(timezone.utc)
+                    "payment_confirmed_at": datetime.now(timezone.utc).isoformat()
                 }
             }
         )
@@ -3322,10 +3398,41 @@ async def confirm_reservation_payment(
                 "$set": {
                     "status": "paid",
                     "payment_status": "paid",
-                    "updated_at": datetime.now(timezone.utc)
+                    "reservation_confirmed": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }
             }
         )
+        
+        # Award loyalty points for reservation payment
+        tx = await db.payment_transactions.find_one({"session_id": session_id})
+        if tx:
+            total_amount = tx.get("amount", 0)
+            points = int(total_amount * POINTS_PER_RON)
+            if points > 0:
+                existing_pts = await db.loyalty_history.find_one({"order_id": reservation_id, "user_id": user.user_id})
+                if not existing_pts:
+                    restaurant_name = tx.get("metadata", {}).get("restaurant_name", "")
+                    await db.loyalty_points.update_one(
+                        {"user_id": user.user_id},
+                        {
+                            "$inc": {"total_points": points, "lifetime_points": points},
+                            "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}
+                        },
+                        upsert=True
+                    )
+                    await db.loyalty_history.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "user_id": user.user_id,
+                        "order_id": reservation_id,
+                        "points": points,
+                        "amount_spent": total_amount,
+                        "restaurant_name": restaurant_name,
+                        "type": "earned",
+                        "description": f"+{points} puncte pentru rezervare de {total_amount} RON la {restaurant_name}",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    logger.info(f"Loyalty points awarded via confirm-payment: {points} to {user.user_id}")
         
         return {
             "success": True,

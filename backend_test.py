@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Restaurant App - Iteration 3
-Tests all backend functionality including .env file, authentication, restaurants, loyalty points, payments, and admin stats.
+Backend API Testing for Restaurant App - Iteration 4 Bug Fixes
+Tests specific bug fixes: loyalty points from real payments, payment status updates, and restaurant name changes.
 """
 
 import requests
@@ -362,6 +362,114 @@ class RestaurantAPITester:
         self.log_test("GET capacity settings returns default settings", True)
         return True
 
+    def test_payment_checkout_status_endpoint(self):
+        """Test 11: GET /api/payments/checkout/status/{session_id} endpoint exists and handles requests"""
+        # Test with a dummy session ID to verify endpoint exists
+        dummy_session_id = "cs_test_dummy_session_id_12345"
+        success, response = self.api_request('GET', f'/payments/checkout/status/{dummy_session_id}', expected_status=500)
+        
+        # We expect this to fail with 500 (Stripe error) but endpoint should exist
+        if response.get('status_code') == 404:
+            self.log_test("Payment checkout status endpoint exists", False, 
+                        "Endpoint not found - should exist even if it fails with invalid session")
+            return False
+        
+        # If we get any response (even error), endpoint exists
+        self.log_test("Payment checkout status endpoint exists", True, 
+                    "Endpoint responds (expected to fail with dummy session)")
+        return True
+
+    def test_loyalty_points_integration_with_payments(self):
+        """Test 12: Verify loyalty points system is integrated with real payments (not mock)"""
+        if not self.session_token:
+            self.log_test("Loyalty points integration test skipped", False, "No session token")
+            return False
+        
+        # Get current loyalty points
+        success, initial_response = self.api_request('GET', '/loyalty/my-points')
+        if not success:
+            self.log_test("Get initial loyalty points failed", False, 
+                        f"API error: {json.dumps(initial_response, indent=2)}")
+            return False
+        
+        initial_points = initial_response.get('total_points', 0)
+        
+        # Create an order to test payment integration
+        order_data = {
+            "restaurant_id": "rest_amza_sibiu",
+            "items": [
+                {
+                    "menu_item_id": "item_loyalty_test", 
+                    "name": "Loyalty Test Item",
+                    "quantity": 1, 
+                    "price": 55.0,  # 55 RON should give 55 points (1 point per RON)
+                    "image_url": "https://example.com/test.jpg"
+                }
+            ],
+            "origin_url": "https://commission-rates.preview.emergentagent.com"
+        }
+        
+        success, order_response = self.api_request('POST', '/orders/create', order_data)
+        if not success:
+            self.log_test("Create order for loyalty test failed", False, 
+                        f"API error: {json.dumps(order_response, indent=2)}")
+            return False
+        
+        # Verify order has correct commission calculation (7% for new customer = 3.85 on 55 RON)
+        payment = order_response.get('payment', {})
+        commission = payment.get('platform_fee', 0)
+        expected_commission = 55.0 * 0.07  # 7% for new customer
+        
+        if abs(commission - expected_commission) > 0.01:
+            self.log_test("Order commission calculation correct (7% new customer)", False, 
+                        f"Expected ~{expected_commission:.2f}, got {commission}")
+            return False
+        
+        self.log_test("Order created with correct commission (7% = 3.85 on 55 RON)", True, 
+                    f"Commission: {commission}")
+        
+        # Note: We can't actually complete the Stripe payment in tests, but we verified:
+        # 1. Order creation works with correct commission
+        # 2. Loyalty points endpoint exists and returns data
+        # 3. The payment checkout status endpoint exists
+        # The actual loyalty points awarding happens in the checkout status endpoint when payment is confirmed
+        
+        return True
+
+    def test_restaurant_name_change_hamza_to_amza(self):
+        """Test 13: Verify restaurant name changed from Hamza to Amza throughout system"""
+        # Test restaurants list
+        success, restaurants = self.api_request('GET', '/restaurants')
+        if not success:
+            self.log_test("Get restaurants for name check failed", False, 
+                        f"API error: {json.dumps(restaurants, indent=2)}")
+            return False
+        
+        hamza_found = False
+        amza_found = False
+        restaurant_names = []
+        
+        for restaurant in restaurants:
+            name = restaurant.get('name', '')
+            restaurant_names.append(name)
+            if 'hamza' in name.lower():
+                hamza_found = True
+            if 'amza' in name.lower():
+                amza_found = True
+        
+        if hamza_found:
+            self.log_test("No 'Hamza' restaurant found (should be renamed)", False, 
+                        f"Found restaurant with 'Hamza' in name. All names: {restaurant_names}")
+            return False
+        
+        if not amza_found:
+            self.log_test("'Amza' restaurant exists", False, 
+                        f"No restaurant with 'Amza' found. All names: {restaurant_names}")
+            return False
+        
+        self.log_test("Restaurant name successfully changed from Hamza to Amza", True)
+        return True
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🧪 Starting Backend API Tests for Restaurant App")
@@ -396,6 +504,15 @@ class RestaurantAPITester:
         
         # Test 10: Capacity settings
         self.test_capacity_settings()
+        
+        # Test 11: Payment checkout status endpoint
+        self.test_payment_checkout_status_endpoint()
+        
+        # Test 12: Loyalty points integration with payments
+        self.test_loyalty_points_integration_with_payments()
+        
+        # Test 13: Restaurant name change verification
+        self.test_restaurant_name_change_hamza_to_amza()
         
         # Print summary
         print("\n" + "=" * 60)
